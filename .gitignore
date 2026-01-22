@@ -1,0 +1,42 @@
+# -----------------------------
+# Корень (общие правила)
+# -----------------------------
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# -----------------------------
+# Client (Next.js)
+# -----------------------------
+client/node_modules
+client/.next
+client/out
+client/dist
+client/.env*.local
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
+client/.pnpm-debug.log*
+
+# -----------------------------
+# Server (NestJS)
+# -----------------------------
+server/node_modules
+server/dist
+server/.env
+server/.env.local
+server/npm-debug.log*
+server/yarn-debug.log*
+server/yarn-error.log*
+server/.pnpm-debug.log*
+server/coverage
+server/.nyc_output
+
