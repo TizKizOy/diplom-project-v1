@@ -1,14 +1,16 @@
-import { IsString, MinLength, MaxLength } from 'class-validator';
-import { ILogin } from '../interfaces/login.interface';
+import { IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
-export class LoginDto implements ILogin {
+export class LoginDto {
+  @ApiProperty({ example: 'admin', description: 'Логин пользователя' })
   @IsString({ message: 'Необходимо передать логин' })
-  @MinLength(3, { message: 'Логин минимум 3 символа' })
-  @MaxLength(30, { message: 'Логин максимум 30 символов' })
+  @MinLength(3)
+  @MaxLength(30)
   login: string;
 
+  @ApiProperty({ example: 'admin', description: 'Пароль' })
   @IsString({ message: 'Необходимо передать пароль' })
-  @MinLength(3, { message: 'Пароль минимум 3 символа' })
-  @MaxLength(30, { message: 'Пароль максимум 30 символов' })
+  @MinLength(5)
+  @MaxLength(55)
   password: string;
 }

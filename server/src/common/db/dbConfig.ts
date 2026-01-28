@@ -14,7 +14,7 @@ export const query = async (text: string, params?: any[], userId?: number) => {
   const client = await pool.connect();
   try {
     if (userId) {
-      await client.query('SET app.user_id = $1', [userId]);
+      await client.query(`SET app.user_id = ${userId}`);
     }
     const result = await client.query(text, params);
     return result.rows;

@@ -8,3 +8,13 @@ export interface IUser {
   regDate: Date;
   roleName: string;
 }
+
+export interface IDeletedUserResult {
+  deleted_id: number;
+  message: string;
+}
+
+export interface IRestoredUserResult {
+  restored_id: number;
+  message: string;
+}

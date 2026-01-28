@@ -1,38 +1,39 @@
 import { query } from 'src/common/db/dbConfig';
 import { CreateUserDto } from '../dto/create-user.dto';
-import { IUser } from '../interfaces/user.interface';
 import { UpdateUserDto } from '../dto/update-user.dto';
+import {
+  IUser,
+  IDeletedUserResult,
+  IRestoredUserResult,
+} from '../interfaces/user.interface';
 import { hashingPassword } from 'src/common/hash/crypto';
 
-export const getAllUsers = async (userId?: number): Promise<IUser[]> => {
-  return (await query('SELECT * FROM f_users_get()', [], userId)) as IUser[];
+export const getAllUsers = async (): Promise<IUser[]> => {
+  return await query('SELECT * FROM f_users_get()');
 };
 
-export const getUser = async (
-  filter: {
-    id?: number;
-    roleId?: string;
-    email?: string;
-    login?: string;
-  },
-  userId?: number,
-): Promise<IUser> => {
-  const rows = await query(
-    'SELECT * FROM f_users_get($1,$2,$3,$4) LIMIT 1',
-    [
-      filter.id ?? null,
-      filter.roleId ?? null,
-      filter.email ?? null,
-      filter.login ?? null,
-    ],
-    userId,
-  );
+export const getUser = async (filter: {
+  id?: number;
+  roleId?: number;
+  email?: string;
+  login?: string;
+}): Promise<IUser | null> => {
+  const rows = await query('SELECT * FROM f_users_get($1,$2,$3,$4) LIMIT 1', [
+    filter.id ?? null,
+    filter.roleId ?? null,
+    filter.email ?? null,
+    filter.login ?? null,
+  ]);
   return rows[0];
+};
+
+export const getDeletedUsers = async (id?: number): Promise<IUser[]> => {
+  return await query('SELECT * FROM f_users_get_deleted($1)', [id ?? null]);
 };
 
 export const createUser = async (
   dto: CreateUserDto,
-  adminId?: number,
+  adminId: number,
 ): Promise<IUser> => {
   const hash = await hashingPassword(dto.password);
   const rows = await query(
@@ -45,19 +46,24 @@ export const createUser = async (
 
 export const updateUser = async (
   id: number,
-  user: UpdateUserDto,
-  adminId?: number,
+  dto: UpdateUserDto,
+  adminId: number,
 ): Promise<IUser> => {
+  let passwordHash: string | null = null;
+  if (dto.password) {
+    passwordHash = await hashingPassword(dto.password);
+  }
+
   const rows = await query(
     'SELECT * FROM f_users_update($1,$2,$3,$4,$5,$6,$7)',
     [
       id,
-      user.fullName,
-      user.login,
-      user.phone,
-      user.email,
-      user.passwordHash,
-      user.roleId,
+      dto.fullName ?? null,
+      dto.login ?? null,
+      dto.phone ?? null,
+      dto.email ?? null,
+      passwordHash,
+      dto.roleId ?? null,
     ],
     adminId,
   );
@@ -66,15 +72,28 @@ export const updateUser = async (
 
 export const deleteUser = async (
   id: number,
-  adminId?: number,
-): Promise<{ deleted_id: number; message: string }> => {
-  const rows = (await query(
-    'SELECT * FROM f_users_delete($1)',
+  adminId: number,
+): Promise<IDeletedUserResult> => {
+  const rows = await query('SELECT * FROM f_users_delete($1)', [id], adminId);
+  return rows[0];
+};
+
+export const restoreUser = async (
+  id: number,
+  adminId: number,
+): Promise<IRestoredUserResult> => {
+  const rows = await query('SELECT * FROM f_users_restore($1)', [id], adminId);
+  return rows[0];
+};
+
+export const hardDeleteUser = async (
+  id: number,
+  adminId: number,
+): Promise<IDeletedUserResult> => {
+  const rows = await query(
+    'SELECT * FROM f_users_hard_delete($1)',
     [id],
     adminId,
-  )) as {
-    deleted_id: number;
-    message: string;
-  }[];
+  );
   return rows[0];
 };

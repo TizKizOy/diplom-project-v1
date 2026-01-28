@@ -1,38 +1,43 @@
 import {
   IsString,
   MinLength,
-  Matches,
-  IsEmail,
   MaxLength,
+  IsEmail,
+  Matches,
 } from 'class-validator';
-import { IUser } from 'src/users/interfaces/user.interface';
+import { ApiProperty } from '@nestjs/swagger';
 
-export class RegisterDto implements Omit<
-  IUser,
-  'roleName' | 'passwordHash' | 'regDate' | 'pkIdUser'
-> {
+export class RegisterDto {
+  @ApiProperty({ example: 'Иванов Иван Иванович' })
   @IsString({ message: 'Необходимо передать ФИО' })
-  @MinLength(2, { message: 'ФИО минимум 2 символа' })
-  @MaxLength(30, { message: 'ФИО максимум 30 символов' })
+  @MinLength(3)
+  @MaxLength(30)
   fullName: string;
 
+  @ApiProperty({ example: 'ivanov' })
   @IsString({ message: 'Необходимо передать логин' })
-  @MinLength(3, { message: 'Логин минимум 3 символа' })
-  @MaxLength(30, { message: 'Логин максимум 30 символов' })
+  @MinLength(3)
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_.-]+$/, {
+    message: 'Логин может содержать только латиницу, цифры, . _ -',
+  })
   login: string;
 
+  @ApiProperty({ example: '+375291234567' })
   @IsString({ message: 'Необходимо передать телефон' })
   @Matches(/^(\+\d{1,3}[- ]?)?\d{10}$/, {
-    message: 'Телефон в формате +375291234567 или 291234567',
+    message: 'Телефон в формате +375291234567',
   })
   phone: string;
 
+  @ApiProperty({ example: 'ivan@example.com' })
   @IsEmail({}, { message: 'Некорректный email' })
-  @MaxLength(100, { message: 'Email максимум 100 символов' })
+  @MaxLength(50)
   email: string;
 
+  @ApiProperty({ example: 'password123' })
   @IsString({ message: 'Необходимо передать пароль' })
-  @MinLength(4, { message: 'Пароль минимум 4 символа' })
-  @MaxLength(255, { message: 'Пароль максимум 255 символов' })
+  @MinLength(5)
+  @MaxLength(55)
   password: string;
 }

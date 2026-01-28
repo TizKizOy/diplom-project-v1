@@ -2,60 +2,105 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/users.db';
-import { IUser } from './interfaces/user.interface';
+import {
+  IUser,
+  IDeletedUserResult,
+  IRestoredUserResult,
+} from './interfaces/user.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  async getAll(userId?: number): Promise<IUser[]> {
-    const users = await db.getAllUsers(userId);
-    if (!users || users.length === 0)
-      throw new NotFoundException('Сервер не получил данные с бд');
+  async getAll(): Promise<IUser[]> {
+    const users = await db.getAllUsers();
+    if (!users || users.length === 0) {
+      throw new NotFoundException('Пользователи не найдены');
+    }
     return users;
   }
 
-  async getById(id: number, userId?: number): Promise<IUser> {
-    const findUser = await db.getUser({ id: id }, userId);
-    if (!findUser)
-      throw new NotFoundException(`Сервер не получил пользователя с id=${id}`);
-    return findUser;
+  async getById(id: number): Promise<IUser> {
+    const user = await db.getUser({ id });
+    if (!user) {
+      throw new NotFoundException(`Пользователь с id=${id} не найден`);
+    }
+    return user;
   }
 
-  async create(dto: CreateUserDto, adminId?: number): Promise<IUser> {
+  async getDeleted(): Promise<IUser[]> {
+    const users = await db.getDeletedUsers();
+    if (!users || users.length === 0) {
+      throw new NotFoundException('Удалённые пользователи не найдены');
+    }
+    return users;
+  }
+
+  async create(dto: CreateUserDto, adminId: number): Promise<IUser> {
     try {
       return await db.createUser(dto, adminId);
     } catch (e: any) {
-      if (e.code === '23505') {
-        const field = e.constraint?.replace(/^tbusers_+|_key$/g, '');
-        throw new ConflictException(`Поле ${field} уже существует`);
+      if (e.message?.includes('уже занят')) {
+        throw new ConflictException(e.message);
       }
-      throw e;
+      if (e.code === '23505') {
+        const field = e.constraint?.match(/tbUsers_(.+)_key/)?.[1] || 'поле';
+        throw new ConflictException(`${field} уже существует`);
+      }
+      throw new BadRequestException(
+        e.message || 'Ошибка создания пользователя',
+      );
     }
   }
 
   async update(
     id: number,
     dto: UpdateUserDto,
-    adminId?: number,
+    adminId: number,
   ): Promise<IUser> {
     try {
+      await this.getById(id);
       return await db.updateUser(id, dto, adminId);
     } catch (e: any) {
-      throw new ConflictException(e.message);
+      if (e instanceof NotFoundException) throw e;
+      if (e.message?.includes('уже занят')) {
+        throw new ConflictException(e.message);
+      }
+      throw new BadRequestException(
+        e.message || 'Ошибка обновления пользователя',
+      );
     }
   }
 
-  async remove(
-    id: number,
-    adminId?: number,
-  ): Promise<{ deleted_id: number; message: string }> {
-    const res = await db.deleteUser(id, adminId);
-    if (res.deleted_id === 0) {
-      throw new NotFoundException(res.message);
+  async remove(id: number, adminId: number): Promise<IDeletedUserResult> {
+    try {
+      const result = await db.deleteUser(id, adminId);
+      if (result.deleted_id === 0) {
+        throw new NotFoundException(result.message);
+      }
+      return result;
+    } catch (e: any) {
+      if (e instanceof NotFoundException) throw e;
+      throw new BadRequestException(e.message);
     }
-    return res;
+  }
+
+  async restore(id: number, adminId: number): Promise<IRestoredUserResult> {
+    try {
+      return await db.restoreUser(id, adminId);
+    } catch (e: any) {
+      throw new BadRequestException(e.message);
+    }
+  }
+
+  async hardDelete(id: number, adminId: number): Promise<IDeletedUserResult> {
+    try {
+      return await db.hardDeleteUser(id, adminId);
+    } catch (e: any) {
+      throw new BadRequestException(e.message);
+    }
   }
 }
