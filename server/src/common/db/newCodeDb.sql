@@ -1283,7 +1283,65 @@
 	          ))
 	        ORDER BY "submittedAt" ASC;
 	    $$;
-	
+
+		CREATE OR REPLACE FUNCTION f_attempts_update(
+				p_id          INT,
+				p_taskId      INT DEFAULT NULL,
+				p_listenerId  INT DEFAULT NULL,
+				p_statusId    INT DEFAULT NULL,
+				p_score       INT DEFAULT NULL
+		)
+		RETURNS v_attempts
+		LANGUAGE plpgsql
+		AS $$
+		DECLARE
+				v_id INT;
+				v_result v_attempts;
+		BEGIN
+				-- Проверяем существование попытки
+				IF NOT EXISTS (
+						SELECT 1 FROM tbAttempt 
+						WHERE pkIdAttemp = p_id AND isDeleted = FALSE
+				) THEN
+						RAISE EXCEPTION 'Попытка % не найдена или удалена', p_id;
+				END IF;
+
+				-- Проверяем новое задание (если меняется)
+				IF p_taskId IS NOT NULL THEN
+						IF NOT EXISTS (SELECT 1 FROM tbTasks WHERE pkIdTask = p_taskId AND isDeleted = FALSE) THEN
+								RAISE EXCEPTION 'Задание % не найдено или удалено', p_taskId;
+						END IF;
+				END IF;
+
+				-- Проверяем нового слушателя (если меняется)
+				IF p_listenerId IS NOT NULL THEN
+						IF NOT EXISTS (
+								SELECT 1 FROM tbUsers 
+								WHERE pkIdUser = p_listenerId AND isDeleted = FALSE AND fkIdRole = 3
+						) THEN
+								RAISE EXCEPTION 'Слушатель % не найден, удалён или не является слушателем', p_listenerId;
+						END IF;
+				END IF;
+
+				-- Проверяем новый статус (если меняется)
+				IF p_statusId IS NOT NULL THEN
+						IF NOT EXISTS (SELECT 1 FROM tbStatusAttempt WHERE pkIdStatusAttempt = p_statusId) THEN
+								RAISE EXCEPTION 'Статус % не найден', p_statusId;
+						END IF;
+				END IF;
+
+				UPDATE tbAttempt
+				SET fkIdTask = COALESCE(p_taskId, fkIdTask),
+						fkIdListener = COALESCE(p_listenerId, fkIdListener),
+						fkIdStatusAttempt = COALESCE(p_statusId, fkIdStatusAttempt),
+						score = COALESCE(p_score, score)
+				WHERE pkIdAttemp = p_id AND isDeleted = FALSE
+				RETURNING pkIdAttemp INTO v_id;
+
+				SELECT * INTO v_result FROM v_attempts WHERE "pkIdAttemp" = v_id;
+				RETURN v_result;
+		END;
+		$$;
 	    
 	    CREATE OR REPLACE FUNCTION f_attempts_create(
 		    p_taskId     INT,
@@ -1975,22 +2033,24 @@
 
 	--#region ===== GROUP LISTENERS =====
 		CREATE OR REPLACE FUNCTION f_grouplisteners_get(
-			p_group    INT DEFAULT NULL,
-			p_listener INT DEFAULT NULL
+				p_id       INT DEFAULT NULL,  -- ← НОВЫЙ ПАРАМЕТР (поиск по ID записи)
+				p_group    INT DEFAULT NULL,
+				p_listener INT DEFAULT NULL
 		)
 		RETURNS SETOF v_group_listeners
 		LANGUAGE sql STABLE
 		AS $$
-			SELECT * FROM v_group_listeners
-			WHERE (p_group    IS NULL OR "pkIdGroupListener" IN (
-				SELECT pkIdGroupListener FROM tbGroupListener 
-				WHERE fkIdGroup = p_group AND isDeleted = FALSE
-			))
-			  AND (p_listener IS NULL OR "pkIdGroupListener" IN (
-				SELECT pkIdGroupListener FROM tbGroupListener 
-				WHERE fkIdListener = p_listener AND isDeleted = FALSE
-			))
-			ORDER BY "groupName", "listenerName";
+				SELECT * FROM v_group_listeners
+				WHERE (p_id       IS NULL OR "pkIdGroupListener" = p_id)  -- ← НОВОЕ УСЛОВИЕ
+					AND (p_group    IS NULL OR "pkIdGroupListener" IN (
+							SELECT pkIdGroupListener FROM tbGroupListener 
+							WHERE fkIdGroup = p_group AND isDeleted = FALSE
+					))
+					AND (p_listener IS NULL OR "pkIdGroupListener" IN (
+							SELECT pkIdGroupListener FROM tbGroupListener 
+							WHERE fkIdListener = p_listener AND isDeleted = FALSE
+					))
+				ORDER BY "groupName", "listenerName";
 		$$;
 		
 		
@@ -2038,6 +2098,91 @@
 		END;
 		$$;
 		
+		CREATE OR REPLACE FUNCTION f_grouplisteners_update(
+			p_id          INT,
+			p_groupId     INT DEFAULT NULL,
+			p_listenerId  INT DEFAULT NULL
+		)
+		RETURNS v_group_listeners
+		LANGUAGE plpgsql
+		AS $$
+		DECLARE
+			v_id        INT;
+			v_result    v_group_listeners;
+			v_old_group INT;
+			v_old_listener INT;
+		BEGIN
+			-- Получаем текущие значения
+			SELECT fkIdGroup, fkIdListener 
+			INTO v_old_group, v_old_listener
+			FROM tbGroupListener 
+			WHERE pkIdGroupListener = p_id;
+
+			-- Проверка что запись существует
+			IF v_old_group IS NULL THEN
+					RAISE EXCEPTION 'Запись % не найдена', p_id;
+			END IF;
+
+			IF v_old_group IS NOT NULL AND NOT EXISTS (
+					SELECT 1 FROM tbGroup WHERE pkIdGroup = v_old_group AND isDeleted = FALSE
+			) THEN
+					RAISE EXCEPTION 'Группа записи удалена';
+			END IF;
+
+			-- Проверяем новую группу если меняется
+			IF p_groupId IS NOT NULL AND p_groupId != v_old_group THEN
+					IF NOT EXISTS (SELECT 1 FROM tbGroup WHERE pkIdGroup = p_groupId AND isDeleted = FALSE) THEN
+							RAISE EXCEPTION 'Группа % не найдена или удалена', p_groupId;
+					END IF;
+			END IF;
+
+			-- Проверяем нового слушателя если меняется
+			IF p_listenerId IS NOT NULL AND p_listenerId != v_old_listener THEN
+					IF NOT EXISTS (
+							SELECT 1 FROM tbUsers 
+							WHERE pkIdUser = p_listenerId 
+							AND isDeleted = FALSE 
+							AND fkIdRole = 3
+					) THEN
+							RAISE EXCEPTION 'Слушатель % не найден, удалён или не является слушателем', p_listenerId;
+					END IF;
+
+					-- Проверяем что слушатель еще не в этой группе (если меняем группу или слушателя)
+					IF EXISTS (
+							SELECT 1 FROM tbGroupListener 
+							WHERE fkIdGroup = COALESCE(p_groupId, v_old_group)
+							AND fkIdListener = p_listenerId
+							AND pkIdGroupListener != p_id
+							AND isDeleted = FALSE
+					) THEN
+							RAISE EXCEPTION 'Слушатель уже состоит в этой группе';
+					END IF;
+			END IF;
+
+			-- Проверяем уникальность если меняется только группа (на того же слушателя)
+			IF p_groupId IS NOT NULL AND p_groupId != v_old_group AND (p_listenerId IS NULL OR p_listenerId = v_old_listener) THEN
+					IF EXISTS (
+							SELECT 1 FROM tbGroupListener 
+							WHERE fkIdGroup = p_groupId
+							AND fkIdListener = v_old_listener
+							AND pkIdGroupListener != p_id
+							AND isDeleted = FALSE
+					) THEN
+							RAISE EXCEPTION 'Слушатель уже состоит в группе %', p_groupId;
+					END IF;
+			END IF;
+
+			-- Обновляем
+			UPDATE tbGroupListener
+			SET fkIdGroup = COALESCE(p_groupId, fkIdGroup),
+					fkIdListener = COALESCE(p_listenerId, fkIdListener)
+			WHERE pkIdGroupListener = p_id
+			RETURNING pkIdGroupListener INTO v_id;
+
+			SELECT * INTO v_result FROM v_group_listeners WHERE "pkIdGroupListener" = v_id;
+			RETURN v_result;
+		END;
+		$$;
 		
 		CREATE OR REPLACE FUNCTION f_grouplisteners_remove(p_id INT)
 		RETURNS TABLE(deleted_id INT, message TEXT)

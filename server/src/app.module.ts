@@ -10,6 +10,7 @@ import { AttemptsModule } from './attempts/attempts.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { MaterialsModule } from './materials/materials.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { GroupListenersModule } from './group-listeners/group-listeners.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     UsersModule,
     CoursesModule,
     GroupsModule,
+    GroupListenersModule,
     TasksModule,
     AttemptsModule,
     CertificatesModule,

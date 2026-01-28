@@ -7,19 +7,14 @@ import {
   IRestoredCourseResult,
 } from '../interfaces/courses.interfaces';
 
-export const getAllCourses = async (): Promise<ICourse[]> => {
-  return await query('SELECT * FROM f_courses_get()');
-};
-
-export const getCourse = async (
-  id?: number,
-  statusId?: number,
-): Promise<ICourse> => {
-  const rows = await query('SELECT * FROM f_courses_get($1, $2)', [
-    id ?? null,
-    statusId ?? null,
+export const getCourses = async (filter: {
+  id?: number;
+  statusId?: number;
+}): Promise<ICourse[]> => {
+  return await query('SELECT * FROM f_courses_get($1, $2)', [
+    filter.id ?? null,
+    filter.statusId ?? null,
   ]);
-  return rows[0];
 };
 
 export const getDeletedCourses = async (id?: number): Promise<ICourse[]> => {

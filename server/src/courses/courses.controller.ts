@@ -11,7 +11,7 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
 import { ICourse } from './interfaces/courses.interfaces';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -22,20 +22,32 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
 
-@ApiTags('Сourses')
+@ApiTags('Courses')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('courses')
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить все активные курсы' })
+  @ApiOperation({ summary: 'Получить все курсы' })
   async getAll(): Promise<ICourse[]> {
     return await this.coursesService.getAll();
   }
 
+  @Get('status/:statusId')
+  @ApiOperation({
+    summary:
+      'Получить курсы по статусу: 1-Черновик, 2-Активен, 3-Устарел, 4-Архив',
+  })
+  async getByStatus(
+    @Param('statusId', ParseIntPipe) statusId: number,
+  ): Promise<ICourse[]> {
+    return await this.coursesService.getByStatus(statusId);
+  }
+
+  @Get('deleted/list')
   @Roles(Role.ADMIN)
-  @Get('deleted')
   @ApiOperation({ summary: 'Получить удалённые курсы' })
   async getDeleted(): Promise<ICourse[]> {
     return await this.coursesService.getDeleted();
@@ -47,62 +59,56 @@ export class CoursesController {
     return await this.coursesService.getById(id);
   }
 
-  @Roles(Role.ADMIN, Role.TEACHER)
   @Post()
-  @ApiOperation({ summary: 'Создать новый курс' })
-  @ApiBody({ type: CreateCourseDto })
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({ summary: 'Создать курс' })
   async create(
     @Body() body: CreateCourseDto,
-    @CurrentUser('sub') adminId: number,
+    @CurrentUser('pkIdUser') adminId: number,
   ): Promise<ICourse> {
     return await this.coursesService.create(body, adminId);
   }
 
-  @Roles(Role.ADMIN, Role.TEACHER)
   @Put(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({ summary: 'Обновить курс' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCourseDto,
-    @CurrentUser('sub') adminId: number,
+    @CurrentUser('pkIdUser') adminId: number,
   ): Promise<ICourse> {
     return await this.coursesService.update(id, body, adminId);
   }
 
-  @Roles(Role.ADMIN, Role.TEACHER)
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({
     summary: 'Soft-delete курса (каскадно удаляет группы, задания, материалы)',
   })
   async deleteCourse(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('sub') adminId: number,
+    @CurrentUser('pkIdUser') adminId: number,
   ): Promise<{ deleted_id: number; message: string }> {
     return await this.coursesService.remove(id, adminId);
   }
 
-  @Roles(Role.ADMIN)
   @Post(':id/restore')
-  @ApiOperation({
-    summary:
-      'Восстановить удалённый курс (каскадно восстанавливает связанные данные)',
-  })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Восстановить курс' })
   async restore(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('sub') adminId: number,
+    @CurrentUser('pkIdUser') adminId: number,
   ): Promise<{ restored_id: number; message: string }> {
     return await this.coursesService.restore(id, adminId);
   }
 
-  @Roles(Role.ADMIN)
   @Delete(':id/hard')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Жёсткое удаление курса (требует предварительного soft-delete)',
-  })
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Жёсткое удаление курса' })
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('sub') adminId: number,
+    @CurrentUser('pkIdUser') adminId: number,
   ): Promise<{ deleted_id: number; message: string }> {
     return await this.coursesService.hardDelete(id, adminId);
   }

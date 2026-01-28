@@ -15,20 +15,44 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  async getAll(): Promise<IUser[]> {
-    const users = await db.getAllUsers();
+  async getUsers(filter: {
+    id?: number;
+    roleId?: number;
+    email?: string;
+    login?: string;
+  }): Promise<IUser[]> {
+    const users = await db.getUsers(filter);
     if (!users || users.length === 0) {
       throw new NotFoundException('Пользователи не найдены');
     }
     return users;
   }
 
+  async getAll(): Promise<IUser[]> {
+    return await this.getUsers({});
+  }
+
   async getById(id: number): Promise<IUser> {
-    const user = await db.getUser({ id });
+    const users = await db.getUsers({ id });
+    const user = users[0];
     if (!user) {
       throw new NotFoundException(`Пользователь с id=${id} не найден`);
     }
     return user;
+  }
+
+  async getByRole(roleId: number): Promise<IUser[]> {
+    return await this.getUsers({ roleId });
+  }
+
+  async findByEmail(email: string): Promise<IUser> {
+    const users = await db.getUsers({ email });
+    return users[0];
+  }
+
+  async findByLogin(login: string): Promise<IUser> {
+    const users = await db.getUsers({ login });
+    return users[0];
   }
 
   async getDeleted(): Promise<IUser[]> {
@@ -43,12 +67,8 @@ export class UsersService {
     try {
       return await db.createUser(dto, adminId);
     } catch (e: any) {
-      if (e.message?.includes('уже занят')) {
-        throw new ConflictException(e.message);
-      }
-      if (e.code === '23505') {
-        const field = e.constraint?.match(/tbUsers_(.+)_key/)?.[1] || 'поле';
-        throw new ConflictException(`${field} уже существует`);
+      if (e.message?.includes('уже занят') || e.code === '23505') {
+        throw new BadRequestException(e.message);
       }
       throw new BadRequestException(
         e.message || 'Ошибка создания пользователя',
@@ -66,8 +86,8 @@ export class UsersService {
       return await db.updateUser(id, dto, adminId);
     } catch (e: any) {
       if (e instanceof NotFoundException) throw e;
-      if (e.message?.includes('уже занят')) {
-        throw new ConflictException(e.message);
+      if (e.message?.includes('уже занят') || e.code === '23505') {
+        throw new BadRequestException(e.message);
       }
       throw new BadRequestException(
         e.message || 'Ошибка обновления пользователя',

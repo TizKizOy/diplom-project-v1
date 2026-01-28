@@ -8,23 +8,18 @@ import {
 } from '../interfaces/user.interface';
 import { hashingPassword } from 'src/common/hash/crypto';
 
-export const getAllUsers = async (): Promise<IUser[]> => {
-  return await query('SELECT * FROM f_users_get()');
-};
-
-export const getUser = async (filter: {
+export const getUsers = async (filter: {
   id?: number;
   roleId?: number;
   email?: string;
   login?: string;
-}): Promise<IUser | null> => {
-  const rows = await query('SELECT * FROM f_users_get($1,$2,$3,$4) LIMIT 1', [
+}): Promise<IUser[]> => {
+  return await query('SELECT * FROM f_users_get($1, $2, $3, $4)', [
     filter.id ?? null,
     filter.roleId ?? null,
     filter.email ?? null,
     filter.login ?? null,
   ]);
-  return rows[0];
 };
 
 export const getDeletedUsers = async (id?: number): Promise<IUser[]> => {

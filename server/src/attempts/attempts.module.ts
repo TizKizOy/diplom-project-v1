@@ -5,5 +5,6 @@ import { AttemptsController } from './attempts.controller';
 @Module({
   controllers: [AttemptsController],
   providers: [AttemptsService],
+  exports: [AttemptsService],
 })
 export class AttemptsModule {}
