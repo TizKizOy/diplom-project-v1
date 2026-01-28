@@ -13,7 +13,9 @@ export class JwtAuthGuard implements CanActivate {
     const token = request.cookies?.accessToken;
 
     if (!token) {
-      throw new UnauthorizedException('Access токен отсутствует');
+      throw new UnauthorizedException(
+        'Access токен отсутствует. Требуется авторизация.',
+      );
     }
 
     try {
@@ -21,7 +23,9 @@ export class JwtAuthGuard implements CanActivate {
       request.user = payload;
       return true;
     } catch {
-      throw new UnauthorizedException('Недействительный access токен');
+      throw new UnauthorizedException(
+        'Недействительный или просроченный access токен',
+      );
     }
   }
 }

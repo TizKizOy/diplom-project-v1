@@ -21,7 +21,9 @@ export class RefreshGuard implements CanActivate {
       request.user = payload;
       return true;
     } catch {
-      throw new UnauthorizedException('Недействительный refresh токен');
+      throw new UnauthorizedException(
+        'Недействительный или просроченный refresh токен',
+      );
     }
   }
 }
