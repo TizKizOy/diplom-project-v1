@@ -12,12 +12,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateTaskDto {
-  @ApiProperty({ example: 1, description: 'ID курса' })
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  courseId: number;
-
   @ApiProperty({
     example: 2,
     description: 'ID типа задания: 1-Тест, 2-Практическая, 3-Аттестация',
@@ -28,6 +22,25 @@ export class CreateTaskDto {
   @Max(3)
   @Type(() => Number)
   typeId: number;
+
+  @ApiProperty({ example: 1, description: 'ID курса' })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  courseId: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID урока' })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  lessonId: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID теста' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  testId?: number;
 
   @ApiProperty({
     example: 'Домашняя работа #1',
@@ -45,10 +58,30 @@ export class CreateTaskDto {
     description: 'Описание задания',
     maxLength: 511,
   })
+  @IsString()
+  @IsOptional()
+  @MaxLength(511)
+  description?: string;
+
+  @ApiPropertyOptional({
+    example: 'В этом задание необходимо реализовать такой функционал ...',
+    description: 'Текст задания',
+    maxLength: 5048,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(5048)
+  content?: string;
+
+  @ApiPropertyOptional({
+    example: 'Ссылка на файл',
+    description: 'Файл с заданием',
+    maxLength: 511,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(511)
-  description?: string;
+  contentFileUrl?: string;
 
   @ApiPropertyOptional({
     example: '2025-09-15T23:59:59Z',
@@ -63,9 +96,20 @@ export class CreateTaskDto {
     description: 'Максимальный балл',
     default: 100,
   })
-  @IsOptional()
   @IsInt()
   @Min(1)
+  @IsOptional()
   @Type(() => Number)
   maxScore?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Порядок уроков',
+    default: 0,
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  sortOrder?: number;
 }

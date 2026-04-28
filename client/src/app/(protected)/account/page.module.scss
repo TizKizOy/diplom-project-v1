@@ -1,0 +1,187 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+}
+
+.container { max-width: 72rem; }
+
+.title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2.4rem;
+}
+
+.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.8rem;
+  padding: 1.2rem 1.6rem;
+  font-size: 1.4rem;
+  margin-bottom: 1.6rem;
+}
+
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 0.8rem;
+  padding: 1.2rem 1.6rem;
+  font-size: 1.4rem;
+  margin-bottom: 1.6rem;
+}
+
+.profileCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.6rem;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 2.4rem;
+  border-bottom: 1px solid $border;
+}
+
+.avatar {
+  width: 6.4rem;
+  height: 6.4rem;
+  border-radius: 50%;
+  background: $blue;
+  color: #fff;
+  font-size: 2.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+
+  h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.4rem;
+  }
+}
+
+.role {
+  display: inline-block;
+  font-size: 1.3rem;
+  background: $blue-light;
+  color: $blue;
+  padding: 0.2rem 1rem;
+  border-radius: 2rem;
+  font-weight: 500;
+}
+
+.position {
+  display: block;
+  font-size: 1.3rem;
+  color: $text-muted;
+  margin-top: 0.4rem;
+}
+
+.editButton {
+  background: $blue-light;
+  color: $blue;
+  border: none;
+  padding: 0.8rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #c7d7f9; }
+}
+
+.form { padding: 2.4rem; }
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6rem;
+
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  label {
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  input {
+    padding: 0.9rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    color: #0f172a;
+    background: #fff;
+    transition: border-color 0.15s;
+    outline: none;
+
+    &:focus { border-color: $blue; }
+    &:disabled { background: #f8fafc; color: $text-muted; }
+  }
+}
+
+.hint { font-size: 1.2rem; color: $text-muted; }
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.4rem;
+  padding-top: 2rem;
+  border-top: 1px solid $border;
+}
+
+.saveButton {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.cancelButton {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}

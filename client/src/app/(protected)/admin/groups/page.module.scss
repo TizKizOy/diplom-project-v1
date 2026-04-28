@@ -1,0 +1,260 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.addBtn {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 0.9rem 2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+.tableWrapper {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background: #f8fafc;
+    padding: 1.2rem 1.6rem;
+    text-align: left;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: $text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    border-bottom: 1px solid $border;
+  }
+
+  td {
+    padding: 1.2rem 1.6rem;
+    font-size: 1.4rem;
+    color: #0f172a;
+    border-bottom: 1px solid $border;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+}
+
+.bold { font-weight: 600; }
+
+.countBadge {
+  background: $blue-light;
+  color: $blue;
+  font-size: 1.3rem;
+  font-weight: 600;
+  padding: 0.2rem 1rem;
+  border-radius: 2rem;
+}
+
+.empty {
+  text-align: center;
+  padding: 3.2rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.btnOutline {
+  background: none;
+  border: 1px solid $border;
+  color: #475569;
+  padding: 0.5rem 1.2rem;
+  border-radius: 0.6rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+
+  &:hover { border-color: $blue; color: $blue; }
+}
+
+.btnIcon {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  transition: background 0.15s;
+
+  &:hover { background: $blue-light; }
+}
+
+.btnIconDanger {
+  @extend .btnIcon;
+  &:hover { background: #fee2e2; }
+}
+
+// Modal
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 2rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 1.6rem;
+  padding: 3.2rem;
+  width: 100%;
+  max-width: 52rem;
+  max-height: 90vh;
+  overflow-y: auto;
+
+  h3 { font-size: 2rem; font-weight: 700; color: #0f172a; margin-bottom: 2.4rem; }
+}
+
+.errorBox {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 0.8rem;
+  padding: 1.2rem 1.6rem;
+  font-size: 1.4rem;
+  margin-bottom: 1.6rem;
+}
+
+.form { display: flex; flex-direction: column; gap: 0; }
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.6rem;
+
+  label { font-size: 1.3rem; font-weight: 500; color: #374151; }
+
+  input, select {
+    padding: 0.9rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    outline: none;
+    transition: border-color 0.15s;
+
+    &:focus { border-color: $blue; }
+  }
+}
+
+.formActions { display: flex; gap: 1rem; }
+
+.btnPrimary {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.btnSecondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}
+
+// Listeners
+.addRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+
+.selectFull {
+  flex: 1;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid $border;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  outline: none;
+
+  &:focus { border-color: $blue; }
+}
+
+.listenerList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: 30rem;
+  overflow-y: auto;
+}
+
+.listenerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.2rem;
+  background: #f8fafc;
+  border: 1px solid $border;
+  border-radius: 0.8rem;
+
+  div { display: flex; flex-direction: column; gap: 0.2rem; }
+}
+
+.sub { font-size: 1.2rem; color: $text-muted; }
+
+.emptyText { font-size: 1.4rem; color: $text-muted; text-align: center; padding: 2rem 0; }

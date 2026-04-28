@@ -1,29 +1,34 @@
 import { query } from 'src/common/db/dbConfig';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import {
-  IUser,
-  IDeletedUserResult,
-  IRestoredUserResult,
-} from '../interfaces/user.interface';
+import { IUser } from '../interfaces/user.interface';
+import { IDeletedResult } from '../../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../../common/interfaces/restore.interface';
 import { hashingPassword } from 'src/common/hash/crypto';
 
 export const getUsers = async (filter: {
   id?: number;
-  roleId?: number;
-  email?: string;
   login?: string;
+  roleId?: number;
+  isDeleted?: boolean;
 }): Promise<IUser[]> => {
-  return await query('SELECT * FROM f_users_get($1, $2, $3, $4)', [
-    filter.id ?? null,
-    filter.roleId ?? null,
-    filter.email ?? null,
-    filter.login ?? null,
-  ]);
+  return await query<IUser>(
+    `EXEC prGetUsersWithRolesAndPositions
+    @pkIdUser = @id,
+    @login = @login,
+    @roleId = @roleId,
+    @isDeleted = @isDeleted`,
+    {
+      id: filter.id ?? null,
+      login: filter.login ?? null,
+      roleId: filter.roleId ?? null,
+      isDeleted: filter.isDeleted ?? 0,
+    },
+  );
 };
 
-export const getDeletedUsers = async (id?: number): Promise<IUser[]> => {
-  return await query('SELECT * FROM f_users_get_deleted($1)', [id ?? null]);
+export const getDeletedUsers = async (): Promise<IUser[]> => {
+  return await getUsers({ isDeleted: true });
 };
 
 export const createUser = async (
@@ -31,12 +36,29 @@ export const createUser = async (
   adminId: number,
 ): Promise<IUser> => {
   const hash = await hashingPassword(dto.password);
-  const rows = await query(
-    'SELECT * FROM f_users_create($1,$2,$3,$4,$5,$6)',
-    [dto.fullName, dto.login, dto.phone, dto.email, hash, dto.roleId],
+
+  const result = await query<IUser>(
+    `EXEC spUsersCreate
+      @fullName = @fullName,
+      @login = @login,
+      @phone = @phone,
+      @email = @email,
+      @passwordHash = @passwordHash,
+      @fkIdRole = @fkIdRole,
+      @fkIdPosition = @fkIdPosition`,
+    {
+      fullName: dto.fullName,
+      login: dto.login,
+      phone: dto.phone,
+      email: dto.email,
+      passwordHash: hash,
+      fkIdRole: dto.roleId,
+      fkIdPosition: dto.positionId ?? null,
+    },
     adminId,
   );
-  return rows[0];
+
+  return result[0];
 };
 
 export const updateUser = async (
@@ -49,46 +71,64 @@ export const updateUser = async (
     passwordHash = await hashingPassword(dto.password);
   }
 
-  const rows = await query(
-    'SELECT * FROM f_users_update($1,$2,$3,$4,$5,$6,$7)',
-    [
-      id,
-      dto.fullName ?? null,
-      dto.login ?? null,
-      dto.phone ?? null,
-      dto.email ?? null,
-      passwordHash,
-      dto.roleId ?? null,
-    ],
+  const result = await query<IUser>(
+    `EXEC spUsersUpdate
+    @pkIdUser = @pkIdUser,
+    @fullName = @fullName,
+    @login = @login,
+    @phone = @phone,
+    @email = @email,
+    @passwordHash = @passwordHash,
+    @fkIdRole = @fkIdRole,
+    @fkIdPosition = @fkIdPosition`,
+    {
+      pkIdUser: id,
+      fullName: dto.fullName ?? null,
+      login: dto.login ?? null,
+      phone: dto.phone ?? null,
+      email: dto.email ?? null,
+      passwordHash: passwordHash ?? null,
+      fkIdRole: dto.roleId ?? null,
+      fkIdPosition: dto.positionId ?? null,
+    },
     adminId,
   );
-  return rows[0];
+
+  return result[0];
 };
 
 export const deleteUser = async (
   id: number,
   adminId: number,
-): Promise<IDeletedUserResult> => {
-  const rows = await query('SELECT * FROM f_users_delete($1)', [id], adminId);
-  return rows[0];
+): Promise<IDeletedResult> => {
+  const result = await query<IDeletedResult>(
+    `EXEC spUsersDelete @pkIdUser = @pkIdUser`,
+    { pkIdUser: id },
+    adminId,
+  );
+  return result[0];
 };
 
 export const restoreUser = async (
   id: number,
   adminId: number,
-): Promise<IRestoredUserResult> => {
-  const rows = await query('SELECT * FROM f_users_restore($1)', [id], adminId);
-  return rows[0];
+): Promise<IRestoredResult> => {
+  const result = await query<IRestoredResult>(
+    `EXEC spUsersRestore @pkIdUser = @pkIdUser`,
+    { pkIdUser: id },
+    adminId,
+  );
+  return result[0];
 };
 
 export const hardDeleteUser = async (
   id: number,
   adminId: number,
-): Promise<IDeletedUserResult> => {
-  const rows = await query(
-    'SELECT * FROM f_users_hard_delete($1)',
-    [id],
+): Promise<IDeletedResult> => {
+  const result = await query<IDeletedResult>(
+    `EXEC spUsersHardDelete @pkIdUser = @pkIdUser`,
+    { pkIdUser: id },
     adminId,
   );
-  return rows[0];
+  return result[0];
 };

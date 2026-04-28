@@ -1,0 +1,145 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  max-width: 72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.unreadCount {
+  background: $blue;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  padding: 0.3rem 1rem;
+  border-radius: 2rem;
+}
+
+.btnMarkAll {
+  background: $blue-light;
+  color: $blue;
+  border: none;
+  padding: 0.8rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #c7d7f9; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.empty {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 6.4rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+
+  span { font-size: 4rem; }
+  p { font-size: 1.5rem; color: $text-muted; }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 1.6rem 2rem;
+  border-bottom: 1px solid $border;
+  transition: background 0.15s;
+
+  &:last-child { border-bottom: none; }
+
+  &.unread {
+    background: #f8faff;
+    border-left: 3px solid $blue;
+  }
+}
+
+.itemDot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: $border;
+  flex-shrink: 0;
+
+  .unread & { background: $blue; }
+}
+
+.itemContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.itemMessage {
+  font-size: 1.4rem;
+  color: #0f172a;
+  line-height: 1.5;
+}
+
+.itemDate {
+  font-size: 1.2rem;
+  color: $text-muted;
+}
+
+.btnRead {
+  background: none;
+  border: 1px solid $border;
+  color: $text-muted;
+  padding: 0.5rem 1.2rem;
+  border-radius: 0.6rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+
+  &:hover { border-color: $blue; color: $blue; }
+}

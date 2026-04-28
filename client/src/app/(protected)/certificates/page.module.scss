@@ -1,0 +1,121 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+.title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.empty {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.6rem;
+  padding: 6.4rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+
+  span:first-child { font-size: 4.8rem; }
+  p { font-size: 1.6rem; color: #0f172a; font-weight: 500; }
+}
+
+.hint { font-size: 1.3rem; color: $text-muted; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+  gap: 2rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.6rem;
+  padding: 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0.4rem;
+    background: $blue;
+  }
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.icon { font-size: 2.8rem; }
+
+.date {
+  font-size: 1.2rem;
+  color: $text-muted;
+  background: #f8fafc;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.6rem;
+}
+
+.courseName {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.listener {
+  font-size: 1.3rem;
+  color: $blue;
+  font-weight: 500;
+}
+
+.template {
+  font-size: 1.2rem;
+  color: $text-muted;
+}
+
+.downloadBtn {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: auto;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}

@@ -1,14 +1,12 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/materials.db';
-import {
-  IMaterial,
-  IDeletedMaterialResult,
-  IRestoredMaterialResult,
-} from './interfaces/materials.interfaces';
+import { IMaterial } from './interfaces/materials.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 
@@ -16,17 +14,18 @@ import { UpdateMaterialDto } from './dto/update-material.dto';
 export class MaterialsService {
   async getMaterials(filter: {
     id?: number;
-    course?: number;
+    courseId?: number;
+    lessonId?: number;
+    typeMaterialId?: number;
+    isDeleted?: boolean;
   }): Promise<IMaterial[]> {
     const materials = await db.getMaterials(filter);
-    if (!materials || materials.length === 0) {
-      throw new NotFoundException('Материалы не найдены');
-    }
-    return materials;
+    return materials || [];
   }
 
-  async getAll(): Promise<IMaterial[]> {
-    return await this.getMaterials({});
+  async getAll(): Promise<any[]> {
+    const result = await db.getMaterials({});
+    return result || [];
   }
 
   async getById(id: number): Promise<IMaterial> {
@@ -39,17 +38,13 @@ export class MaterialsService {
   }
 
   async getByCourse(courseId: number): Promise<IMaterial[]> {
-    return await this.getMaterials({ course: courseId });
+    return await this.getMaterials({ courseId: courseId });
   }
 
-  async getDeleted(id?: number): Promise<IMaterial[]> {
-    const materials = await db.getDeletedMaterials(id);
+  async getDeleted(): Promise<IMaterial[]> {
+    const materials = await db.getDeletedMaterials();
     if (!materials || materials.length === 0) {
-      throw new NotFoundException(
-        id
-          ? `Удалённый материал с id=${id} не найден`
-          : 'Удалённые материалы не найдены',
-      );
+      throw new NotFoundException('Удалённые материалы не найдены');
     }
     return materials;
   }
@@ -58,7 +53,7 @@ export class MaterialsService {
     try {
       return await db.createMaterial(dto, adminId);
     } catch (e: any) {
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
+      if (e.message && e.message.includes('не найден') || e.message && e.message.includes('уже существует')) {
         throw new NotFoundException(e.message);
       }
       throw new BadRequestException(e.message || 'Ошибка создания материала');
@@ -70,70 +65,42 @@ export class MaterialsService {
     dto: UpdateMaterialDto,
     adminId: number,
   ): Promise<IMaterial> {
+    await this.getById(id);
     try {
-      await this.getById(id);
       return await db.updateMaterial(id, dto, adminId);
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
+      if (e.message && e.message.includes('не найден') || e.message && e.message.includes('уже существует')) {
         throw new NotFoundException(e.message);
       }
-      throw new BadRequestException(e.message || 'Ошибка обновления материала');
+      throw new BadRequestException(e.message || 'Ошибка создания материала');
     }
   }
 
-  async remove(id: number, adminId: number): Promise<IDeletedMaterialResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteMaterial(id, adminId);
-      if (result.deleted_id === 0) {
+      if (result.deletedId === 0) {
         throw new NotFoundException(`Материал с id=${id} не найден`);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('уже удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(id: number, adminId: number): Promise<IRestoredMaterialResult> {
+  async restore(id: number, adminId: number): Promise<IRestoredResult> {
     try {
       return await db.restoreMaterial(id, adminId);
     } catch (e: any) {
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('не был удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
-      if (e.message?.includes('Невозможно восстановить: курс удалён')) {
-        throw new BadRequestException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async hardDelete(
-    id: number,
-    adminId: number,
-  ): Promise<IDeletedMaterialResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteMaterial(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('необходимо сначала пометить как удалённый')) {
-        throw new BadRequestException(e.message);
-      }
-      if (e.message?.includes('не найден')) {
-        throw new NotFoundException(e.message);
-      }
-      throw new BadRequestException(e.message);
+     throw new BadRequestException(e.message);
     }
   }
 }

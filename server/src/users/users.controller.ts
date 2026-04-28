@@ -20,6 +20,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { IUser } from './interfaces/user.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -65,25 +67,11 @@ export class UsersController {
     return user;
   }
 
-  @Get('search/email')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Найти пользователя по email' })
-  @ApiQuery({ name: 'value', required: true, example: 'user@example.com' })
-  async getByEmail(@Query('value') email: string): Promise<IUser> {
-    const user = await this.usersService.findByEmail(email);
-    if (!user)
-      throw new NotFoundException(`Пользователь с email ${email} не найден`);
-    return user;
-  }
-
-  @Get('filter')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Универсальный поиск (роль + ...)' })
-  @ApiQuery({ name: 'roleId', required: false, type: Number })
-  async getByFilter(@Query('roleId') roleId?: string): Promise<IUser[]> {
-    return await this.usersService.getUsers({
-      roleId: roleId ? parseInt(roleId) : undefined,
-    });
+  @Get('deleted/list')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Получить удалённых пользователей' })
+  async getDeleted(): Promise<IUser[]> {
+    return await this.usersService.getDeleted();
   }
 
   @Get(':id')
@@ -91,13 +79,6 @@ export class UsersController {
   @ApiOperation({ summary: 'Получить пользователя по ID' })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<IUser> {
     return await this.usersService.getById(id);
-  }
-
-  @Get('deleted/list')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Получить удалённых пользователей' })
-  async getDeleted(): Promise<IUser[]> {
-    return await this.usersService.getDeleted();
   }
 
   @Post()
@@ -127,7 +108,7 @@ export class UsersController {
   async deleteUser(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.usersService.remove(id, adminId);
   }
 
@@ -137,7 +118,7 @@ export class UsersController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.usersService.restore(id, adminId);
   }
 
@@ -148,7 +129,7 @@ export class UsersController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.usersService.hardDelete(id, adminId);
   }
 }

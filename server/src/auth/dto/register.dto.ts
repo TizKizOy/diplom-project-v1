@@ -4,18 +4,22 @@ import {
   MaxLength,
   IsEmail,
   Matches,
+  IsOptional,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class RegisterDto {
   @ApiProperty({
     example: 'Иванов Иван Иванович',
     description: 'Полное имя (ФИО)',
-    minLength: 3,
+    minLength: 5,
     maxLength: 30,
   })
   @IsString({ message: 'Необходимо передать ФИО' })
-  @MinLength(3, { message: 'ФИО минимум 3 символа' })
+  @MinLength(5, { message: 'ФИО минимум 5 символа' })
   @MaxLength(30, { message: 'ФИО максимум 30 символов' })
   fullName: string;
 
@@ -63,4 +67,19 @@ export class RegisterDto {
   @MinLength(5, { message: 'Пароль минимум 5 символов' })
   @MaxLength(55, { message: 'Пароль максимум 55 символов' })
   password: string;
+
+  @ApiProperty({
+    description: `ID должности: 1-Учитель информатики, 2-Учитель математики, 3-Учитель физики,
+          4-Учитель русского языка, 5-Учитель английского языка, 6-Учитель психологии,
+          7-Учитель начальных классов, 8-Методист`,
+    example: 3,
+    minimum: 1,
+    maximum: 8,
+    enum: [1, 2, 3, 4, 5, 6, 7, 8],
+  })
+  @IsOptional()
+  @IsInt({ message: 'ID должности должно быть числом' })
+  @Min(1, { message: 'ID должности ≥ 1' })
+  @Type(() => Number)
+  positionId?: number;
 }

@@ -14,6 +14,8 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
 import { ICourse } from './interfaces/courses.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
@@ -35,22 +37,22 @@ export class CoursesController {
     return await this.coursesService.getAll();
   }
 
-  @Get('status/:statusId')
-  @ApiOperation({
-    summary:
-      'Получить курсы по статусу: 1-Черновик, 2-Активен, 3-Устарел, 4-Архив',
-  })
-  async getByStatus(
-    @Param('statusId', ParseIntPipe) statusId: number,
-  ): Promise<ICourse[]> {
-    return await this.coursesService.getByStatus(statusId);
-  }
-
   @Get('deleted/list')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Получить удалённые курсы' })
   async getDeleted(): Promise<ICourse[]> {
     return await this.coursesService.getDeleted();
+  }
+
+  @Get('status/:statusId')
+  @ApiOperation({
+    summary:
+      'Получить курсы по статусу: 1-Черновик, 2-Опубликован, 3-Архивирован',
+  })
+  async getByStatus(
+    @Param('statusId', ParseIntPipe) statusId: number,
+  ): Promise<ICourse[]> {
+    return await this.coursesService.getByStatus(statusId);
   }
 
   @Get(':id')
@@ -88,7 +90,7 @@ export class CoursesController {
   async deleteCourse(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.coursesService.remove(id, adminId);
   }
 
@@ -98,7 +100,7 @@ export class CoursesController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.coursesService.restore(id, adminId);
   }
 
@@ -109,7 +111,7 @@ export class CoursesController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.coursesService.hardDelete(id, adminId);
   }
 }

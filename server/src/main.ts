@@ -7,6 +7,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { checkDbConnection } from './common/db/dbConfig';
 import { AppModule } from './app.module';
 
+//todo: Реализовать CertificateTemplates
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const port = process.env.PORT ?? 3000;

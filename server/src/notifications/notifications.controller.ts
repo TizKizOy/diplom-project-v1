@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UseGuards,
   Query,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +20,8 @@ import {
 } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { INotification } from './interfaces/notifications.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
@@ -42,45 +45,24 @@ export class NotificationsController {
 
   @Get('user/:userId')
   @ApiOperation({ summary: 'Получить уведомления пользователя' })
-  @ApiQuery({
-    name: 'unread',
-    required: false,
-    type: Boolean,
-    description: 'Только непрочитанные',
-  })
   async getByUser(
     @Param('userId', ParseIntPipe) userId: number,
-    @Query('unread') unread?: string,
+    @Query('onlyUnread', ParseBoolPipe) onlyUnread?: boolean,  
   ): Promise<INotification[]> {
-    return await this.notificationsService.getByUser(
-      userId,
-      unread === 'true' ? true : unread === 'false' ? false : undefined,
-    );
+    return await this.notificationsService.getByUser(userId, onlyUnread);
   }
 
   @Get('deleted/list')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Получить удалённые уведомления' })
-  @ApiQuery({ name: 'id', required: false, type: Number })
-  async getDeleted(@Query('id') id?: string): Promise<INotification[]> {
-    return await this.notificationsService.getDeleted(
-      id ? parseInt(id) : undefined,
-    );
+  async getDeleted(): Promise<INotification[]> {
+    return await this.notificationsService.getDeleted();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Получить уведомление по ID' })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<INotification> {
     return await this.notificationsService.getById(id);
-  }
-
-  @Post()
-  @ApiOperation({ summary: 'Создать уведомление пользователю' })
-  async create(
-    @Body() body: CreateNotificationDto,
-    @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<INotification> {
-    return await this.notificationsService.create(body, adminId);
   }
 
   @Post(':id/read')
@@ -97,18 +79,8 @@ export class NotificationsController {
   async delete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.notificationsService.remove(id, adminId);
-  }
-
-  @Post(':id/restore')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Восстановить удалённое уведомление' })
-  async restore(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
-    return await this.notificationsService.restore(id, adminId);
   }
 
   @Delete(':id/hard')
@@ -118,7 +90,7 @@ export class NotificationsController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.notificationsService.hardDelete(id, adminId);
   }
 }

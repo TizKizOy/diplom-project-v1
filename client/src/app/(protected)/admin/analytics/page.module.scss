@@ -1,0 +1,168 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$muted: #64748b;
+$dark: #0f172a;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40rem;
+}
+
+.spinner {
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0.3rem solid $blue-light;
+  border-top-color: $blue;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 3.2rem;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.6rem;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: $dark; }
+}
+
+.courseFilter {
+  padding: 0.9rem 1.2rem;
+  border: 1px solid $border;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  outline: none;
+  background: #fff;
+  min-width: 24rem;
+
+  &:focus { border-color: $blue; }
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1.6rem;
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 3px solid transparent;
+
+  &.blue   { border-top-color: $blue; }
+  &.green  { border-top-color: #16a34a; }
+  &.purple { border-top-color: #7c3aed; }
+  &.orange { border-top-color: #ea580c; }
+  &.yellow { border-top-color: #ca8a04; }
+  &.red    { border-top-color: #dc2626; }
+}
+
+.statValue { font-size: 3.2rem; font-weight: 700; color: $dark; line-height: 1; }
+.statLabel { font-size: 1.4rem; font-weight: 500; color: $dark; }
+.statSub   { font-size: 1.2rem; color: $muted; }
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+
+  h2 { font-size: 1.8rem; font-weight: 600; color: $dark; }
+}
+
+.tableWrap {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background: #f8fafc;
+    padding: 1.2rem 1.6rem;
+    text-align: left;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: $muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    border-bottom: 1px solid $border;
+  }
+
+  td {
+    padding: 1.2rem 1.6rem;
+    font-size: 1.4rem;
+    color: $dark;
+    border-bottom: 1px solid $border;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+}
+
+.bold { font-weight: 600; }
+.muted { color: $muted; font-size: 1.3rem; }
+
+.badge {
+  font-size: 1.2rem;
+  font-weight: 500;
+  padding: 0.3rem 1rem;
+  border-radius: 2rem;
+
+  &.green  { background: #dcfce7; color: #166534; }
+  &.yellow { background: #fef9c3; color: #854d0e; }
+  &.gray   { background: #f1f5f9; color: #475569; }
+}
+
+.empty {
+  text-align: center;
+  padding: 3.2rem;
+  color: $muted;
+  font-size: 1.4rem;
+}
+
+.attemptsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1.6rem;
+}
+
+.attemptCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-left: 4px solid transparent;
+
+  &.yellow { border-left-color: #ca8a04; }
+  &.green  { border-left-color: #16a34a; }
+  &.red    { border-left-color: #dc2626; }
+  &.orange { border-left-color: #ea580c; }
+}
+
+.attemptValue { font-size: 3.2rem; font-weight: 700; color: $dark; }
+.attemptLabel { font-size: 1.4rem; color: $muted; }

@@ -1,92 +1,118 @@
 import { query } from 'src/common/db/dbConfig';
 import { CreateCourseDto } from '../dto/create-course.dto';
 import { UpdateCourseDto } from '../dto/update-course.dto';
-import {
-  ICourse,
-  IDeletedCourseResult,
-  IRestoredCourseResult,
-} from '../interfaces/courses.interfaces';
+import { IDeletedResult } from '../../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../../common/interfaces/restore.interface';
+import { ICourse } from '../interfaces/courses.interfaces';
 
 export const getCourses = async (filter: {
   id?: number;
   statusId?: number;
+  title?: string;
+  isDeleted?: boolean;
 }): Promise<ICourse[]> => {
-  return await query('SELECT * FROM f_courses_get($1, $2)', [
-    filter.id ?? null,
-    filter.statusId ?? null,
-  ]);
+  return await query<ICourse>(
+    `EXEC prGetCoursesWithStatusAndTags
+      @pkIdCourse = @pkIdCourse,
+      @fkIdStatus = @fkIdStatus,
+      @title = @title,
+      @isDeleted = @isDeleted`,
+    {
+      pkIdCourse: filter.id ?? null,
+      fkIdStatus: filter.statusId ?? null,
+      title: filter.title ?? null,
+      isDeleted: filter.isDeleted ?? 0,
+    },
+  );
 };
 
-export const getDeletedCourses = async (id?: number): Promise<ICourse[]> => {
-  return await query('SELECT * FROM f_courses_get_deleted($1)', [id ?? null]);
+export const getDeletedCourses = async (): Promise<ICourse[]> => {
+  return await getCourses({ isDeleted: true });
 };
 
 export const createCourse = async (
   dto: CreateCourseDto,
-  adminId: number,
+  userId: number,
 ): Promise<ICourse> => {
-  const rows = await query(
-    'SELECT * FROM f_courses_create($1,$2,$3,$4,$5)',
-    [
-      dto.title,
-      dto.description ?? null,
-      dto.startDate ?? null,
-      dto.endDate ?? null,
-      dto.statusId ?? 1,
-    ],
-    adminId,
+  const result = await query<ICourse>(
+    `EXEC spCoursesCreate
+      @title = @title,
+      @description = @description,
+      @startDate = @startDate,
+      @endDate = @endDate,
+      @fkIdStatus = @fkIdStatus`,
+    {
+      title: dto.title,
+      description: dto.description,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      fkIdStatus: dto.statusId,
+    },
+    userId,
   );
-  return rows[0];
+
+  return result[0];
 };
 
 export const updateCourse = async (
   id: number,
   dto: UpdateCourseDto,
-  adminId: number,
+  userId: number,
 ): Promise<ICourse> => {
-  const rows = await query(
-    'SELECT * FROM f_courses_update($1,$2,$3,$4,$5,$6)',
-    [
-      id,
-      dto.title ?? null,
-      dto.description ?? null,
-      dto.startDate ?? null,
-      dto.endDate ?? null,
-      dto.statusId ?? null,
-    ],
-    adminId,
+  const result = await query<ICourse>(
+    `EXEC spCoursesUpdate
+      @pkIdCourse = @pkIdCourse,
+      @title = @title,
+      @description = @description,
+      @startDate = @startDate,
+      @endDate = @endDate,
+      @fkIdStatus = @fkIdStatus`,
+    {
+      pkIdCourse: id,
+      title: dto.title ?? null,
+      description: dto.description ?? null,
+      startDate: dto.startDate ?? null,
+      endDate: dto.endDate ?? null,
+      fkIdStatus: dto.statusId ?? null,
+    },
+    userId,
   );
-  return rows[0];
+
+  return result[0];
 };
 
 export const deleteCourse = async (
   id: number,
-  adminId: number,
-): Promise<IDeletedCourseResult> => {
-  const rows = await query('SELECT * FROM f_courses_delete($1)', [id], adminId);
-  return rows[0];
+  userId: number,
+): Promise<IDeletedResult> => {
+  const result = await query<IDeletedResult>(
+    `EXEC spCoursesDelete @pkIdCourse = @pkIdCourse`,
+    { pkIdCourse: id },
+    userId,
+  );
+  return result[0];
 };
 
 export const restoreCourse = async (
   id: number,
-  adminId: number,
-): Promise<IRestoredCourseResult> => {
-  const rows = await query(
-    'SELECT * FROM f_courses_restore($1)',
-    [id],
-    adminId,
+  userId: number,
+): Promise<IRestoredResult> => {
+  const result = await query<IRestoredResult>(
+    `EXEC spCoursesRestore @pkIdCourse = @pkIdCourse`,
+    { pkIdCourse: id },
+    userId,
   );
-  return rows[0];
+  return result[0];
 };
 
 export const hardDeleteCourse = async (
   id: number,
-  adminId: number,
-): Promise<IDeletedCourseResult> => {
-  const rows = await query(
-    'SELECT * FROM f_courses_hard_delete($1)',
-    [id],
-    adminId,
+  userId: number,
+): Promise<IDeletedResult> => {
+  const result = await query<IDeletedResult>(
+    `EXEC spCoursesHardDelete @pkIdCourse = @pkIdCourse`,
+    { pkIdCourse: id },
+    userId,
   );
-  return rows[0];
+  return result[0];
 };

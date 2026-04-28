@@ -7,7 +7,7 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET_KEY || 'REFRESH_SECRET';
 const ACCESS_TTL = '15m';
 const REFRESH_TTL = '7d';
 
-export interface IJwtPayload extends Omit<IUser, 'passwordHash' | 'regDate'> {}
+export interface IJwtPayload extends Omit<IUser, 'passwordHash'> {}
 
 export const generatePayload = (dataUser: IJwtPayload) => {
   return {
@@ -16,7 +16,9 @@ export const generatePayload = (dataUser: IJwtPayload) => {
     login: dataUser.login,
     phone: dataUser.phone,
     email: dataUser.email,
+    regData: dataUser.regData,
     roleName: dataUser.roleName,
+    positionName: dataUser.positionName ?? undefined,
   };
 };
 

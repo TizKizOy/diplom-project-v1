@@ -1,50 +1,43 @@
 import { query } from 'src/common/db/dbConfig';
 import { CreateNotificationDto } from '../dto/create-notification.dto';
-import {
-  INotification,
-  IDeletedNotificationResult,
-  IRestoredNotificationResult,
-} from '../interfaces/notifications.interfaces';
+import { INotification } from '../interfaces/notifications.interfaces';
+import { IDeletedResult } from '../../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../../common/interfaces/restore.interface';
 
 export const getNotifications = async (filter: {
   id?: number;
-  user?: number;
-  unread?: boolean;
+  userId?: number;
+  unRead?: boolean;
+  isDeleted?: boolean;
 }): Promise<INotification[]> => {
-  return await query('SELECT * FROM f_notifications_get($1, $2, $3)', [
-    filter.id ?? null,
-    filter.user ?? null,
-    filter.unread ?? null,
-  ]);
-};
-
-export const getDeletedNotifications = async (
-  id?: number,
-): Promise<INotification[]> => {
-  return await query('SELECT * FROM f_notifications_get_deleted($1)', [
-    id ?? null,
-  ]);
-};
-
-export const createNotification = async (
-  dto: CreateNotificationDto,
-  adminId: number,
-): Promise<INotification> => {
-  const rows = await query(
-    'SELECT * FROM f_notifications_create($1, $2)',
-    [dto.userId, dto.message],
-    adminId,
+  return await query<INotification>(
+    `exec prGetNotifications
+    @pkIdNotification = @pkIdNotification,
+    @fkIdUser = @fkIdUser,
+    @onlyUnread = @onlyUnread,
+    @isDeleted = @isDeleted`,
+    {
+      pkIdNotification: filter.id ?? null,
+      fkIdUser: filter.userId ?? null,
+      onlyUnread: filter.unRead ?? 0,
+      isDeleted: filter.isDeleted ?? 0,
+    },
   );
-  return rows[0];
+};
+
+export const getDeletedNotifications = async (): Promise<INotification[]> => {
+  return await getNotifications({ isDeleted: true });
 };
 
 export const markNotificationAsRead = async (
   id: number,
   adminId: number,
 ): Promise<INotification> => {
-  const rows = await query(
-    'SELECT * FROM f_notifications_mark_read($1)',
-    [id],
+  const rows = await query<INotification>(
+    `exec spNotificationsUpdate
+     @pkIdNotification = @pkIdNotification,
+     @isRead = @isRead`,
+    { pkIdNotification: id, isRead: true },
     adminId,
   );
   return rows[0];
@@ -53,22 +46,11 @@ export const markNotificationAsRead = async (
 export const deleteNotification = async (
   id: number,
   adminId: number,
-): Promise<IDeletedNotificationResult> => {
-  const rows = await query(
-    'SELECT * FROM f_notifications_delete($1)',
-    [id],
-    adminId,
-  );
-  return rows[0];
-};
-
-export const restoreNotification = async (
-  id: number,
-  adminId: number,
-): Promise<IRestoredNotificationResult> => {
-  const rows = await query(
-    'SELECT * FROM f_notifications_restore($1)',
-    [id],
+): Promise<IDeletedResult> => {
+  const rows = await query<IDeletedResult>(
+    `exec spNotificationsDelete
+     @pkIdNotification = @pkIdNotification`,
+    { pkIdNotification: id },
     adminId,
   );
   return rows[0];
@@ -77,10 +59,11 @@ export const restoreNotification = async (
 export const hardDeleteNotification = async (
   id: number,
   adminId: number,
-): Promise<IDeletedNotificationResult> => {
-  const rows = await query(
-    'SELECT * FROM f_notifications_hard_delete($1)',
-    [id],
+): Promise<IDeletedResult> => {
+  const rows = await query<IDeletedResult>(
+    `exec spNotificationsHardDelete
+     @pkIdNotification = @pkIdNotification`,
+    { pkIdNotification: id },
     adminId,
   );
   return rows[0];

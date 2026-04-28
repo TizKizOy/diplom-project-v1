@@ -39,6 +39,7 @@ export class AuthService {
         id: user.pkIdUser,
         fullName: user.fullName,
         role: user.roleName,
+        position: user.positionName ?? undefined,
       },
     };
   }
@@ -59,34 +60,9 @@ export class AuthService {
         },
       };
     } catch (e: any) {
-      if (e.message?.includes('уже занят')) {
-        const field = e.message.includes('Логин')
-          ? 'Логин'
-          : e.message.includes('Email')
-            ? 'Email'
-            : 'Поле';
-        throw new ConflictException(`${field} уже существует`);
+      if (e.message && e.message.includes('уже занят')) {
+        throw new ConflictException(e.message);
       }
-
-      if (e.code === '23505') {
-        const constraint = e.constraint || '';
-        if (
-          constraint.includes('login') ||
-          constraint.includes('tbUsers_login_key')
-        ) {
-          throw new ConflictException('Логин уже занят');
-        }
-        if (
-          constraint.includes('email') ||
-          constraint.includes('tbUsers_email_key')
-        ) {
-          throw new ConflictException('Email уже занят');
-        }
-        throw new ConflictException(
-          'Пользователь с такими данными уже существует',
-        );
-      }
-
       throw new BadRequestException(e.message || 'Ошибка регистрации');
     }
   }

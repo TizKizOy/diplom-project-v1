@@ -19,6 +19,14 @@ export class CreateCertificateDto {
   @Type(() => Number)
   courseId: number;
 
+  @ApiProperty({
+    description: 'ID шаблона сертификата',
+    example: 2,
+  })
+  @IsInt({ message: 'ID шаблона должно быть числом' })
+  @Type(() => Number)
+  templateId: number;
+
   @ApiPropertyOptional({
     description: 'URL PDF файла сертификата',
     example: 'https://example.com/certs/cert_123.pdf',

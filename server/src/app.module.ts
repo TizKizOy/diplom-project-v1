@@ -11,6 +11,15 @@ import { CertificatesModule } from './certificates/certificates.module';
 import { MaterialsModule } from './materials/materials.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { GroupListenersModule } from './group-listeners/group-listeners.module';
+import { LessonsModule } from './lessons/lessons.module';
+import { CommentModule } from './comment/comment.module';
+import { MessageModule } from './message/message.module';
+import { CourseTeachersModule } from './course-teachers/course-teachers.module';
+import { TestQuestionsModule } from './test-questions/test-questions.module';
+import { TestOptionsModule } from './test-options/test-options.module';
+import { TestModule } from './tests/test.module';
+import { TestAnswersModule } from './test-answers/test-answers.module';
+import { AdminsModule } from './admin-log/admin-log.module'
 
 @Module({
   imports: [
@@ -25,6 +34,15 @@ import { GroupListenersModule } from './group-listeners/group-listeners.module';
     CertificatesModule,
     MaterialsModule,
     NotificationsModule,
+    LessonsModule,
+    CommentModule,
+    MessageModule,
+    CourseTeachersModule,
+    TestQuestionsModule,
+    TestOptionsModule,
+    TestModule,
+    TestAnswersModule,
+    AdminsModule,
   ],
 })
 export class AppModule {

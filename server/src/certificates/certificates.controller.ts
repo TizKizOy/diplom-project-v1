@@ -21,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { CertificatesService } from './certificates.service';
 import { ICertificate } from './interfaces/certificates.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
 import { UpdateCertificateDto } from './dto/update-certificate.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
@@ -59,19 +61,11 @@ export class CertificatesController {
     return await this.certificatesService.getByCourse(courseId);
   }
 
-  @Get('filter')
+  @Get('deleted/list')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Универсальный поиск сертификатов' })
-  @ApiQuery({ name: 'listenerId', required: false, type: Number })
-  @ApiQuery({ name: 'courseId', required: false, type: Number })
-  async getByFilter(
-    @Query('listenerId') listenerId?: string,
-    @Query('courseId') courseId?: string,
-  ): Promise<ICertificate[]> {
-    return await this.certificatesService.getCertificates({
-      listener: listenerId ? parseInt(listenerId) : undefined,
-      course: courseId ? parseInt(courseId) : undefined,
-    });
+  @ApiOperation({ summary: 'Получить удалённые  сертификаты' })
+  async getDeleted(): Promise<ICertificate[]> {
+    return await this.certificatesService.getDeleted();
   }
 
   @Get(':id')
@@ -79,21 +73,6 @@ export class CertificatesController {
   @ApiOperation({ summary: 'Получить сертификат по ID' })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<ICertificate> {
     return await this.certificatesService.getById(id);
-  }
-
-  @Get('deleted/list')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Получить удалённые (аннулированные) сертификаты' })
-  @ApiQuery({
-    name: 'id',
-    required: false,
-    type: Number,
-    description: 'ID конкретного удалённого сертификата',
-  })
-  async getDeleted(@Query('id') id?: string): Promise<ICertificate[]> {
-    return await this.certificatesService.getDeleted(
-      id ? parseInt(id) : undefined,
-    );
   }
 
   @Post()
@@ -108,7 +87,7 @@ export class CertificatesController {
 
   @Put(':id')
   @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Обновить PDF ссылку сертификата' })
+  @ApiOperation({ summary: 'Обновить сертификат' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCertificateDto,
@@ -123,7 +102,7 @@ export class CertificatesController {
   async delete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.certificatesService.remove(id, adminId);
   }
 
@@ -133,7 +112,7 @@ export class CertificatesController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.certificatesService.restore(id, adminId);
   }
 
@@ -144,7 +123,7 @@ export class CertificatesController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.certificatesService.hardDelete(id, adminId);
   }
 }

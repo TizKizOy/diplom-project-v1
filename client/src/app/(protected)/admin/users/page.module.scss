@@ -1,0 +1,221 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.addButton {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 0.9rem 2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+.errorBox {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 0.8rem;
+  padding: 1.6rem;
+  font-size: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.retryButton {
+  align-self: flex-start;
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.6rem;
+  border-radius: 0.6rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+// Modal
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 2rem;
+}
+
+.formModal {
+  background: #fff;
+  border-radius: 1.6rem;
+  padding: 3.2rem;
+  width: 100%;
+  max-width: 56rem;
+  max-height: 90vh;
+  overflow-y: auto;
+
+  h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 2.4rem;
+  }
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6rem;
+  margin-bottom: 1.6rem;
+
+  @media (max-width: 500px) { grid-template-columns: 1fr; }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.6rem;
+
+  label { font-size: 1.3rem; font-weight: 500; color: #374151; }
+
+  input, select {
+    padding: 0.9rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    outline: none;
+    transition: border-color 0.15s;
+
+    &:focus { border-color: $blue; }
+  }
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.saveButton {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+.cancelButton {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}
+
+// Table
+.tableWrapper {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background: #f8fafc;
+    padding: 1.2rem 1.6rem;
+    text-align: left;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: $text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    border-bottom: 1px solid $border;
+  }
+
+  td {
+    padding: 1.2rem 1.6rem;
+    font-size: 1.4rem;
+    color: #0f172a;
+    border-bottom: 1px solid $border;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: #f8fafc; }
+}
+
+.roleBadge {
+  font-size: 1.2rem;
+  font-weight: 500;
+  padding: 0.3rem 1rem;
+  border-radius: 2rem;
+  background: $blue-light;
+  color: $blue;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.6rem;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  transition: background 0.15s;
+  margin-right: 0.4rem;
+
+  &:hover { background: $blue-light; }
+}
+
+.actionBtnDelete {
+  @extend .actionBtn;
+  &:hover { background: #fee2e2; }
+}

@@ -1,34 +1,63 @@
 import { query } from 'src/common/db/dbConfig';
 import { CreateMaterialDto } from '../dto/create-material.dto';
-import {
-  IMaterial,
-  IDeletedMaterialResult,
-  IRestoredMaterialResult,
-} from '../interfaces/materials.interfaces';
+import { IMaterial } from '../interfaces/materials.interfaces';
+import { IDeletedResult } from '../../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../../common/interfaces/restore.interface';
 
 export const getMaterials = async (filter: {
   id?: number;
-  course?: number;
+  courseId?: number;
+  lessonId?: number;
+  typeMaterialId?: number;
+  isDeleted?: boolean;
 }): Promise<IMaterial[]> => {
-  return await query('SELECT * FROM f_materials_get($1, $2)', [
-    filter.id ?? null,
-    filter.course ?? null,
-  ]);
+  return await query<IMaterial>(
+    `EXEC prGetMaterialsWithTypesAndLessons
+    @pkIdMaterial = @pkIdMaterial,
+    @fkIdCourse = @fkIdCourse,
+    @fkIdLesson = @fkIdLesson,
+    @fkIdTypeMaterial = @fkIdTypeMaterial,
+    @isDeleted = @isDeleted`,
+    {
+      pkIdMaterial: filter.id ?? null,
+      fkIdCourse: filter.courseId ?? null,
+      fkIdLesson: filter.lessonId ?? null,
+      fkIdTypeMaterial: filter.typeMaterialId ?? null,
+      isDeleted: filter.isDeleted ?? 0,
+    },
+  );
 };
 
-export const getDeletedMaterials = async (
-  id?: number,
-): Promise<IMaterial[]> => {
-  return await query('SELECT * FROM f_materials_get_deleted($1)', [id ?? null]);
+export const getDeletedMaterials = async (): Promise<IMaterial[]> => {
+  return await getMaterials({ isDeleted: true });
 };
 
 export const createMaterial = async (
   dto: CreateMaterialDto,
   adminId: number,
 ): Promise<IMaterial> => {
-  const rows = await query(
-    'SELECT * FROM f_materials_create($1, $2, $3, $4)',
-    [dto.courseId, dto.title, dto.fileUrl ?? null, dto.link ?? null],
+  const rows = await query<IMaterial>(
+    `EXEC spMaterialsCreate
+    @fkIdCourse = @fkIdCourse,
+    @fkIdLesson = @fkIdLesson,
+    @fkIdTypeMaterial = @fkIdTypeMaterial,
+    @title = @title,
+    @description = @description,
+    @fileUrl = @fileUrl,
+    @link = @link,
+    @sortOrder = @sortOrder,
+    @isAdditional = @isAdditional`,
+    {
+      fkIdCourse: dto.courseId,
+      fkIdLesson: dto.lessonId,
+      fkIdTypeMaterial: dto.typeMaterialId,
+      title: dto.title,
+      description: dto.description,
+      fileUrl: dto.fileUrl,
+      link: dto.link,
+      sortOrder: dto.sortOrder,
+      isAdditional: dto.isAdditional,
+    },
     adminId,
   );
   return rows[0];
@@ -39,9 +68,30 @@ export const updateMaterial = async (
   dto: Partial<CreateMaterialDto>,
   adminId: number,
 ): Promise<IMaterial> => {
-  const rows = await query(
-    'SELECT * FROM f_materials_update($1, $2, $3, $4)',
-    [id, dto.title ?? null, dto.fileUrl ?? null, dto.link ?? null],
+  const rows = await query<IMaterial>(
+    `EXEC spMaterialsUpdate
+    @pkIdMaterial = @pkIdMaterial,
+    @fkIdCourse = @fkIdCourse,
+    @fkIdLesson = @fkIdLesson,
+    @fkIdTypeMaterial = @fkIdTypeMaterial,
+    @title = @title,
+    @description = @description,
+    @fileUrl = @fileUrl,
+    @link = @link,
+    @sortOrder = @sortOrder,
+    @isAdditional = @isAdditional`,
+    {
+      pkIdMaterial: id,
+      fkIdCourse: dto.courseId ?? null,
+      fkIdLesson: dto.lessonId ?? null,
+      fkIdTypeMaterial: dto.typeMaterialId ?? null,
+      title: dto.title ?? null,
+      description: dto.description ?? null,
+      fileUrl: dto.fileUrl ?? null,
+      link: dto.link ?? null,
+      sortOrder: dto.sortOrder ?? null,
+      isAdditional: dto.isAdditional ?? null,
+    },
     adminId,
   );
   return rows[0];
@@ -50,10 +100,10 @@ export const updateMaterial = async (
 export const deleteMaterial = async (
   id: number,
   adminId: number,
-): Promise<IDeletedMaterialResult> => {
-  const rows = await query(
-    'SELECT * FROM f_materials_delete($1)',
-    [id],
+): Promise<IDeletedResult> => {
+  const rows = await query<IDeletedResult>(
+    `EXEC spMaterialsDelete @pkIdMaterial = @pkIdMaterial`,
+    { pkIdMaterial: id },
     adminId,
   );
   return rows[0];
@@ -62,10 +112,10 @@ export const deleteMaterial = async (
 export const restoreMaterial = async (
   id: number,
   adminId: number,
-): Promise<IRestoredMaterialResult> => {
-  const rows = await query(
-    'SELECT * FROM f_materials_restore($1)',
-    [id],
+): Promise<IRestoredResult> => {
+  const rows = await query<IRestoredResult>(
+    `EXEC spMaterialsRestore @pkIdMaterial = @pkIdMaterial`,
+    { pkIdMaterial: id },
     adminId,
   );
   return rows[0];
@@ -74,10 +124,10 @@ export const restoreMaterial = async (
 export const hardDeleteMaterial = async (
   id: number,
   adminId: number,
-): Promise<IDeletedMaterialResult> => {
-  const rows = await query(
-    'SELECT * FROM f_materials_hard_delete($1)',
-    [id],
+): Promise<IDeletedResult> => {
+  const rows = await query<IDeletedResult>(
+    `EXEC spMaterialsHardDelete @pkIdMaterial = @pkIdMaterial`,
+    { pkIdMaterial: id },
     adminId,
   );
   return rows[0];

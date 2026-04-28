@@ -1,32 +1,29 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/notifications.db';
-import {
-  INotification,
-  IDeletedNotificationResult,
-  IRestoredNotificationResult,
-} from './interfaces/notifications.interfaces';
+import { INotification } from './interfaces/notifications.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 @Injectable()
 export class NotificationsService {
   async getNotifications(filter: {
     id?: number;
-    user?: number;
-    unread?: boolean;
+    userId?: number;
+    unRead?: boolean;
+    isDeleted?: boolean;
   }): Promise<INotification[]> {
     const notifications = await db.getNotifications(filter);
-    if (!notifications || notifications.length === 0) {
-      throw new NotFoundException('Уведомления не найдены');
-    }
-    return notifications;
+    return notifications || [];
   }
 
-  async getAll(): Promise<INotification[]> {
-    return await this.getNotifications({});
+  async getAll(): Promise<any[]> {
+    const result = await db.getNotifications({});
+    return result || [];
   }
 
   async getById(id: number): Promise<INotification> {
@@ -39,102 +36,44 @@ export class NotificationsService {
   }
 
   async getByUser(userId: number, unread?: boolean): Promise<INotification[]> {
-    return await this.getNotifications({ user: userId, unread });
+    return await this.getNotifications({ userId: userId, unRead: unread });
   }
 
-  async getDeleted(id?: number): Promise<INotification[]> {
-    const notifications = await db.getDeletedNotifications(id);
+  async getDeleted(): Promise<INotification[]> {
+    const notifications = await db.getDeletedNotifications();
     if (!notifications || notifications.length === 0) {
-      throw new NotFoundException(
-        id
-          ? `Удалённое уведомление с id=${id} не найдено`
-          : 'Удалённые уведомления не найдены',
-      );
+      throw new NotFoundException('Удалённые уведомления не найдены');
     }
     return notifications;
-  }
-
-  async create(
-    dto: CreateNotificationDto,
-    adminId: number,
-  ): Promise<INotification> {
-    try {
-      return await db.createNotification(dto, adminId);
-    } catch (e: any) {
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
-        throw new NotFoundException(e.message);
-      }
-      throw new BadRequestException(e.message || 'Ошибка создания уведомления');
-    }
   }
 
   async markAsRead(id: number, adminId: number): Promise<INotification> {
     try {
       return await db.markNotificationAsRead(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('не найдено') || e.message?.includes('удалено')) {
+      if (e.message && e.message.includes('не найдено')) {
         throw new NotFoundException(e.message);
       }
       throw new BadRequestException(e.message);
     }
   }
 
-  async remove(
-    id: number,
-    adminId: number,
-  ): Promise<IDeletedNotificationResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteNotification(id, adminId);
-      if (result.deleted_id === 0) {
+      if (result.deletedId === 0) {
         throw new NotFoundException(`Уведомление с id=${id} не найдено`);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-
-      if (
-        e.message?.includes('не найдено') ||
-        e.message?.includes('уже удалено')
-      ) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(
-    id: number,
-    adminId: number,
-  ): Promise<IRestoredNotificationResult> {
-    try {
-      return await db.restoreNotification(id, adminId);
-    } catch (e: any) {
-      if (
-        e.message?.includes('не найдено') ||
-        e.message?.includes('не было удалено')
-      ) {
-        throw new NotFoundException(e.message);
-      }
-      if (e.message?.includes('Невозможно восстановить: пользователь удалён')) {
-        throw new BadRequestException(e.message);
-      }
-      throw new BadRequestException(e.message);
-    }
-  }
-
-  async hardDelete(
-    id: number,
-    adminId: number,
-  ): Promise<IDeletedNotificationResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteNotification(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('необходимо сначала пометить как удалённое')) {
-        throw new BadRequestException(e.message);
-      }
-      if (e.message?.includes('не найдено')) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }

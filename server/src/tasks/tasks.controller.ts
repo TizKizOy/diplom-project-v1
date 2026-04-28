@@ -20,6 +20,8 @@ import {
 } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { ITask } from './interfaces/tasks.interface';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
@@ -49,34 +51,14 @@ export class TasksController {
     return await this.tasksService.getByCourse(courseId);
   }
 
-  @Get('type/:typeId')
+  @Get('type/:typeTaskId')
   @ApiOperation({
     summary: 'Получить задания по типу: 1-Тест, 2-Практическая, 3-Аттестация',
   })
   async getByType(
-    @Param('typeId', ParseIntPipe) typeId: number,
+    @Param('typeTaskId', ParseIntPipe) typeTaskId: number,
   ): Promise<ITask[]> {
-    return await this.tasksService.getByType(typeId);
-  }
-
-  @Get('filter')
-  @ApiOperation({ summary: 'Универсальный фильтр (курс + тип)' })
-  @ApiQuery({ name: 'courseId', required: false, type: Number })
-  @ApiQuery({ name: 'typeId', required: false, type: Number })
-  async getByFilter(
-    @Query('courseId') courseId?: string,
-    @Query('typeId') typeId?: string,
-  ): Promise<ITask[]> {
-    return await this.tasksService.getTasks({
-      courseId: courseId ? parseInt(courseId) : undefined,
-      typeId: typeId ? parseInt(typeId) : undefined,
-    });
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Получить задание по ID' })
-  async getById(@Param('id', ParseIntPipe) id: number): Promise<ITask> {
-    return await this.tasksService.getById(id);
+    return await this.tasksService.getByType(typeTaskId);
   }
 
   @Get('deleted/list')
@@ -84,6 +66,12 @@ export class TasksController {
   @ApiOperation({ summary: 'Получить удалённые задания' })
   async getDeleted(): Promise<ITask[]> {
     return await this.tasksService.getDeleted();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Получить задание по ID' })
+  async getById(@Param('id', ParseIntPipe) id: number): Promise<ITask> {
+    return await this.tasksService.getById(id);
   }
 
   @Post()
@@ -113,7 +101,7 @@ export class TasksController {
   async deleteTask(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.tasksService.remove(id, adminId);
   }
 
@@ -123,7 +111,7 @@ export class TasksController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.tasksService.restore(id, adminId);
   }
 
@@ -134,7 +122,7 @@ export class TasksController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.tasksService.hardDelete(id, adminId);
   }
 }

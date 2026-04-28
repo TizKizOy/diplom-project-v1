@@ -1,0 +1,304 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+$green: #16a34a;
+$red: #dc2626;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.errorPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 4rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  max-width: 80rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+// Header
+.testHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.6rem;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.testInfo { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.testMeta { font-size: 1.3rem; color: $text-muted; }
+
+.timer {
+  background: #fff;
+  border: 2px solid $border;
+  border-radius: 0.8rem;
+  padding: 0.8rem 1.6rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+
+  &.timerWarning {
+    border-color: $red;
+    color: $red;
+    animation: pulse 1s infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+// Progress
+.progressBar {
+  height: 0.6rem;
+  background: #f1f5f9;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: $blue;
+  border-radius: 1rem;
+  transition: width 0.3s ease;
+}
+
+.progressText { font-size: 1.3rem; color: $text-muted; margin-top: -1.2rem; }
+
+// Questions
+.questions { display: flex; flex-direction: column; gap: 1.6rem; }
+
+.questionCard {
+  background: #fff;
+  border: 2px solid $border;
+  border-radius: 1.2rem;
+  padding: 2rem;
+  transition: border-color 0.15s;
+
+  &.answered { border-color: #86efac; }
+}
+
+.questionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  margin-bottom: 1.6rem;
+}
+
+.questionNum {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  background: $blue;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.questionText {
+  flex: 1;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.5;
+}
+
+.questionScore {
+  font-size: 1.2rem;
+  color: $text-muted;
+  background: #f8fafc;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.6rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.options { display: flex; flex-direction: column; gap: 0.8rem; }
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.2rem 1.4rem;
+  border: 1.5px solid $border;
+  border-radius: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 1.4rem;
+  color: #374151;
+
+  input[type="radio"] {
+    width: 1.6rem;
+    height: 1.6rem;
+    accent-color: $blue;
+    flex-shrink: 0;
+  }
+
+  &:hover { border-color: $blue; background: $blue-light; }
+
+  &.selectedOption {
+    border-color: $blue;
+    background: $blue-light;
+    color: #0f172a;
+    font-weight: 500;
+  }
+}
+
+// Submit section
+.submitSection {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.submitHint { font-size: 1.4rem; color: $text-muted; }
+
+.submitActions { display: flex; gap: 1.2rem; }
+
+.btnCancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1.2rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}
+
+.btnSubmit {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1.2rem 3.2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.errorText { font-size: 1.3rem; color: $red; }
+
+.backBtn {
+  background: none;
+  border: 1px solid $border;
+  color: #475569;
+  padding: 0.8rem 1.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+// Result screen
+.resultCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.6rem;
+  padding: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.resultIcon { font-size: 5.6rem; }
+
+.resultStatus { font-size: 1.6rem; color: $text-muted; }
+
+.resultScore { font-size: 1.8rem; color: #0f172a; strong { color: $blue; } }
+
+.resultStats {
+  display: flex;
+  gap: 3.2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.resultStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+
+  span { font-size: 1.3rem; color: $text-muted; }
+  strong { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.passed { color: $green !important; }
+.failed { color: $red !important; }
+
+.btnPrimary {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1.2rem 3.2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+// Answers review
+.answersReview {
+  width: 100%;
+  text-align: left;
+
+  h2 { font-size: 1.8rem; font-weight: 600; color: #0f172a; margin-bottom: 1.6rem; }
+}
+
+.reviewItem {
+  padding: 1.4rem 1.6rem;
+  border-radius: 0.8rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid $border;
+
+  &.correct { border-left-color: $green; background: #f0fdf4; }
+  &.wrong   { border-left-color: $red;   background: #fef2f2; }
+}
+
+.reviewQ { font-size: 1.4rem; font-weight: 600; color: #0f172a; margin-bottom: 0.6rem; }
+.reviewA { font-size: 1.3rem; color: $text-muted; margin-top: 0.4rem; }
+.greenText { color: $green; font-weight: 500; }
+.redText   { color: $red;   font-weight: 500; }

@@ -14,8 +14,9 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GroupListenersService } from './group-listeners.service';
 import { IGroupListener } from './interfaces/group-listener.interface';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateGroupListenerDto } from './dto/create-group-listener.dto';
-import { UpdateGroupListenerDto } from './dto/update-group-listener.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -64,32 +65,12 @@ export class GroupListenersController {
   }
 
   @Post()
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({
-    summary: 'Добавить слушателя в группу',
-    description:
-      'Если запись была soft-deleted - восстанавливает её. Проверяет что слушатель не состоит уже в группе.',
-  })
+  @ApiOperation({ summary: 'Добавить слушателя в группу' })
   async create(
     @Body() body: CreateGroupListenerDto,
     @CurrentUser('pkIdUser') adminId: number,
   ): Promise<IGroupListener> {
     return await this.groupListenersService.create(body, adminId);
-  }
-
-  @Put(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({
-    summary:
-      'Обновить запись (перевести в другую группу или сменить слушателя)',
-    description: 'Проверяет уникальность пары (группа+слушатель).',
-  })
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateGroupListenerDto,
-    @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<IGroupListener> {
-    return await this.groupListenersService.update(id, body, adminId);
   }
 
   @Delete(':id')
@@ -98,7 +79,7 @@ export class GroupListenersController {
   async deleteGroupListener(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.groupListenersService.remove(id, adminId);
   }
 
@@ -108,7 +89,7 @@ export class GroupListenersController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.groupListenersService.restore(id, adminId);
   }
 
@@ -119,7 +100,7 @@ export class GroupListenersController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.groupListenersService.hardDelete(id, adminId);
   }
 }

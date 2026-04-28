@@ -14,6 +14,8 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GroupsService } from './groups.service';
 import { IGroup } from './interfaces/groups.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
@@ -21,13 +23,18 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import { GroupListenersService } from 'src/group-listeners/group-listeners.service';
+import { IGroupListener } from 'src/group-listeners/interfaces/group-listener.interface';
 
 @ApiTags('Groups')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(
+    private readonly groupsService: GroupsService,
+    private readonly groupListenersService: GroupListenersService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Получить все группы ' })
@@ -54,6 +61,15 @@ export class GroupsController {
   @ApiOperation({ summary: 'Получить группу по ID' })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<IGroup> {
     return await this.groupsService.getById(id);
+  }
+
+  @Get(':id/listeners')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({ summary: 'Получить слушателей группы' })
+  async getGroupListeners(
+    @Param('id', ParseIntPipe) groupId: number,
+  ): Promise<IGroupListener[]> {
+    return await this.groupListenersService.getByGroup(groupId);
   }
 
   @Post()
@@ -83,7 +99,7 @@ export class GroupsController {
   async deleteGroup(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.groupsService.remove(id, adminId);
   }
 
@@ -93,7 +109,7 @@ export class GroupsController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.groupsService.restore(id, adminId);
   }
 
@@ -104,7 +120,7 @@ export class GroupsController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.groupsService.hardDelete(id, adminId);
   }
 }

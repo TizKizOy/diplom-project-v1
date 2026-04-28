@@ -1,0 +1,233 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+}
+
+.title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tabs {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1rem;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid $border;
+
+  &:last-child { border-right: none; }
+  &:hover { background: #f8fafc; color: #0f172a; }
+
+  &.activeTab {
+    background: $blue;
+    color: #fff;
+  }
+}
+
+.filtersCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2rem;
+
+  h2 { font-size: 1.6rem; font-weight: 600; color: #0f172a; margin-bottom: 1.6rem; }
+}
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.6rem;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 16rem;
+
+  label { font-size: 1.2rem; font-weight: 500; color: #374151; }
+
+  select, input {
+    padding: 0.8rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    outline: none;
+    background: #fff;
+
+    &:focus { border-color: $blue; }
+  }
+}
+
+.btnReset {
+  background: none;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 0.8rem 1.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-end;
+
+  &:hover { background: #fee2e2; }
+}
+
+.previewCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.6rem 2rem;
+  border-bottom: 1px solid $border;
+
+  h2 { font-size: 1.6rem; font-weight: 600; color: #0f172a; }
+}
+
+.count {
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: $text-muted;
+}
+
+.exportBtns {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.btnPDF {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #b91c1c; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.btnCSV {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #15803d; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background: #f8fafc;
+    padding: 1.2rem 1.6rem;
+    text-align: left;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: $text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    border-bottom: 1px solid $border;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 1.2rem 1.6rem;
+    font-size: 1.4rem;
+    color: #0f172a;
+    border-bottom: 1px solid $border;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+}
+
+.bold { font-weight: 600; }
+.muted { color: $text-muted; font-size: 1.3rem; }
+
+.badge {
+  font-size: 1.2rem;
+  font-weight: 500;
+  padding: 0.3rem 1rem;
+  border-radius: 2rem;
+
+  &.green  { background: #dcfce7; color: #166534; }
+  &.yellow { background: #fef9c3; color: #854d0e; }
+  &.gray   { background: #f1f5f9; color: #475569; }
+}
+
+.empty {
+  padding: 4rem;
+  text-align: center;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.btnWord {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e40af; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}

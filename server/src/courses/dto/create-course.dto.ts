@@ -5,8 +5,8 @@ import {
   IsInt,
   Min,
   Max,
-  IsOptional,
   IsDateString,
+  IsOptional,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -26,12 +26,11 @@ export class CreateCourseDto {
   @ApiPropertyOptional({
     example: 'Полный курс по React с нуля',
     description: 'Описание курса',
-    maxLength: 511,
+    maxLength: 2000,
   })
-  @IsOptional()
   @IsString()
-  @MaxLength(511)
-  description?: string;
+  @MaxLength(2000)
+  description: string;
 
   @ApiPropertyOptional({
     example: '2025-09-01T10:00:00Z',
@@ -51,14 +50,13 @@ export class CreateCourseDto {
 
   @ApiPropertyOptional({
     example: 1,
-    description: 'ID статуса: 1-Черновик, 2-Активен, 3-Устарел, 4-Архив',
+    description: 'ID статуса: 1-Черновик, 2-Опубликован, 3-Архивирован',
     default: 1,
-    enum: [1, 2, 3, 4],
+    enum: [1, 2, 3],
   })
-  @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
+  @Max(3)
   @Type(() => Number)
-  statusId?: number;
+  statusId: number;
 }

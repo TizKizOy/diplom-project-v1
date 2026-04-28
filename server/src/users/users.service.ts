@@ -5,11 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/users.db';
-import {
-  IUser,
-  IDeletedUserResult,
-  IRestoredUserResult,
-} from './interfaces/user.interface';
+import { IUser } from './interfaces/user.interface';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -18,8 +16,8 @@ export class UsersService {
   async getUsers(filter: {
     id?: number;
     roleId?: number;
-    email?: string;
     login?: string;
+    isDeleted?: boolean;
   }): Promise<IUser[]> {
     const users = await db.getUsers(filter);
     if (!users || users.length === 0) {
@@ -45,11 +43,6 @@ export class UsersService {
     return await this.getUsers({ roleId });
   }
 
-  async findByEmail(email: string): Promise<IUser> {
-    const users = await db.getUsers({ email });
-    return users[0];
-  }
-
   async findByLogin(login: string): Promise<IUser> {
     const users = await db.getUsers({ login });
     return users[0];
@@ -67,12 +60,10 @@ export class UsersService {
     try {
       return await db.createUser(dto, adminId);
     } catch (e: any) {
-      if (e.message?.includes('уже занят') || e.code === '23505') {
-        throw new BadRequestException(e.message);
+      if (e.message && e.message.includes('уже занят')) {
+        throw new ConflictException(e.message);
       }
-      throw new BadRequestException(
-        e.message || 'Ошибка создания пользователя',
-      );
+      throw new BadRequestException(e.message || 'Ошибка создания пользователя');
     }
   }
 
@@ -81,34 +72,30 @@ export class UsersService {
     dto: UpdateUserDto,
     adminId: number,
   ): Promise<IUser> {
+    await this.getById(id);
     try {
-      await this.getById(id);
       return await db.updateUser(id, dto, adminId);
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-      if (e.message?.includes('уже занят') || e.code === '23505') {
-        throw new BadRequestException(e.message);
+      if (e.message && e.message.includes('уже занят')) {
+        throw new ConflictException(e.message);
       }
-      throw new BadRequestException(
-        e.message || 'Ошибка обновления пользователя',
-      );
+      throw new BadRequestException(e.message || 'Ошибка обновления пользователя');
     }
   }
 
-  async remove(id: number, adminId: number): Promise<IDeletedUserResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteUser(id, adminId);
-      if (result.deleted_id === 0) {
+      if (!result.deletedId) {
         throw new NotFoundException(result.message);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(id: number, adminId: number): Promise<IRestoredUserResult> {
+  async restore(id: number, adminId: number): Promise<IRestoredResult> {
     try {
       return await db.restoreUser(id, adminId);
     } catch (e: any) {
@@ -116,7 +103,7 @@ export class UsersService {
     }
   }
 
-  async hardDelete(id: number, adminId: number): Promise<IDeletedUserResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteUser(id, adminId);
     } catch (e: any) {

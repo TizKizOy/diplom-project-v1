@@ -25,7 +25,7 @@ import { RefreshGuard } from './guards/refresh.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
 
-@ApiTags('Авторизация')
+@ApiTags('Authorization')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

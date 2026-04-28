@@ -1,15 +1,13 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/courses.db';
-import {
-  ICourse,
-  IDeletedCourseResult,
-  IRestoredCourseResult,
-} from './interfaces/courses.interfaces';
+import { ICourse } from './interfaces/courses.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 
@@ -55,17 +53,8 @@ export class CoursesService {
     try {
       return await db.createCourse(dto, adminId);
     } catch (e: any) {
-      if (e.code === '23505') {
-        throw new ConflictException('Курс с таким названием уже существует');
-      }
-      if (e.code === 'P0001' || e.message?.includes('уже существует')) {
+      if (e.message && e.message.includes('уже существует')) {
         throw new ConflictException(e.message);
-      }
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('не существует')
-      ) {
-        throw new BadRequestException(e.message);
       }
       throw new BadRequestException(e.message || 'Ошибка создания курса');
     }
@@ -76,74 +65,41 @@ export class CoursesService {
     dto: UpdateCourseDto,
     adminId: number,
   ): Promise<ICourse> {
+    await this.getById(id);
     try {
-      await this.getById(id);
       return await db.updateCourse(id, dto, adminId);
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-
-      if (e.code === '23505') {
-        throw new ConflictException('Курс с таким названием уже существует');
-      }
-      if (e.code === 'P0001' || e.message?.includes('уже существует')) {
+      if (e.message && e.message.includes('уже существует')) {
         throw new ConflictException(e.message);
-      }
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
-        throw new BadRequestException(e.message);
       }
       throw new BadRequestException(e.message || 'Ошибка обновления курса');
     }
   }
 
-  async remove(id: number, adminId: number): Promise<IDeletedCourseResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteCourse(id, adminId);
-      if (result.deleted_id === 0) {
+      if (!result.deletedId) {
         throw new NotFoundException(result.message);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('уже удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(id: number, adminId: number): Promise<IRestoredCourseResult> {
+  async restore(id: number, adminId: number): Promise<IRestoredResult> {
     try {
       return await db.restoreCourse(id, adminId);
     } catch (e: any) {
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('не был удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
-      if (
-        e.message?.includes('связанные данные') ||
-        e.message?.includes('зависимости')
-      ) {
-        throw new BadRequestException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async hardDelete(id: number, adminId: number): Promise<IDeletedCourseResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteCourse(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('необходимо сначала пометить как удалённый')) {
-        throw new BadRequestException(e.message);
-      }
-      if (e.message?.includes('не найден')) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }

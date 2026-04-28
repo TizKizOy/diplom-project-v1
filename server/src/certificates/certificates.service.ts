@@ -1,14 +1,13 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import * as db from './db/certificates.db';
-import {
-  ICertificate,
-  IDeletedCertificateResult,
-  IRestoredCertificateResult,
-} from './interfaces/certificates.interfaces';
+import { ICertificate } from './interfaces/certificates.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
 import { UpdateCertificateDto } from './dto/update-certificate.dto';
 
@@ -18,16 +17,15 @@ export class CertificatesService {
     id?: number;
     listener?: number;
     course?: number;
+    isDeleted?: boolean;
   }): Promise<ICertificate[]> {
     const certificates = await db.getCertificates(filter);
-    if (!certificates || certificates.length === 0) {
-      throw new NotFoundException('Сертификаты не найдены');
-    }
-    return certificates;
+    return certificates || [];
   }
 
-  async getAll(): Promise<ICertificate[]> {
-    return await this.getCertificates({});
+  async getAll(): Promise<any[]> {
+    const result = await db.getCertificates({});
+    return result || [];
   }
 
   async getById(id: number): Promise<ICertificate> {
@@ -47,14 +45,10 @@ export class CertificatesService {
     return await this.getCertificates({ course: courseId });
   }
 
-  async getDeleted(id?: number): Promise<ICertificate[]> {
-    const certificates = await db.getDeletedCertificates(id);
+  async getDeleted(): Promise<ICertificate[]> {
+    const certificates = await db.getDeletedCertificates();
     if (!certificates || certificates.length === 0) {
-      throw new NotFoundException(
-        id
-          ? `Удалённый сертификат с id=${id} не найден`
-          : 'Удалённые сертификаты не найдены',
-      );
+      throw new NotFoundException('Удалённые сертификаты не найдены');
     }
     return certificates;
   }
@@ -66,13 +60,10 @@ export class CertificatesService {
     try {
       return await db.createCertificate(dto, adminId);
     } catch (e: any) {
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('не является слушателем')
-      ) {
-        throw new NotFoundException(e.message);
-      }
-      throw new BadRequestException(e.message || 'Ошибка выдачи сертификата');
+     if (e.message && e.message.includes('уже существует')) {
+      throw new ConflictException(e.message);
+    }
+    throw new BadRequestException(e.message || 'Ошибка создания сертификата');
     }
   }
 
@@ -81,78 +72,43 @@ export class CertificatesService {
     dto: UpdateCertificateDto,
     adminId: number,
   ): Promise<ICertificate> {
+    await this.getById(id);
     try {
-      await this.getById(id);
-      return await db.updateCertificate(id, dto.pdfUrl, adminId);
+      return await db.updateCertificate(id, dto, adminId);
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
+      if (e.message && e.message.includes('уже существует')) {
+      throw new ConflictException(e.message);
+    }
+    throw new BadRequestException(e.message || 'Ошибка создания сертификата');
 
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
-        throw new NotFoundException(e.message);
-      }
-      throw new BadRequestException(
-        e.message || 'Ошибка обновления сертификата',
-      );
     }
   }
 
-  async remove(
-    id: number,
-    adminId: number,
-  ): Promise<IDeletedCertificateResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteCertificate(id, adminId);
-      if (result.deleted_id === 0) {
+      if (result.deletedId === 0) {
         throw new NotFoundException(`Сертификат с id=${id} не найден`);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('уже удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(
-    id: number,
-    adminId: number,
-  ): Promise<IRestoredCertificateResult> {
+  async restore(id: number, adminId: number): Promise<IRestoredResult> {
     try {
       return await db.restoreCertificate(id, adminId);
     } catch (e: any) {
-      if (
-        e.message?.includes('не найден') ||
-        e.message?.includes('не был удалён')
-      ) {
-        throw new NotFoundException(e.message);
-      }
-      if (e.message?.includes('Невозможно восстановить: слушатель удалён')) {
-        throw new BadRequestException(e.message);
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async hardDelete(
-    id: number,
-    adminId: number,
-  ): Promise<IDeletedCertificateResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteCertificate(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('необходимо сначала пометить как удалённый')) {
-        throw new BadRequestException(e.message);
-      }
-      if (e.message?.includes('не найден')) {
-        throw new NotFoundException(e.message);
-      }
-      throw new BadRequestException(e.message);
+     throw new BadRequestException(e.message);
     }
   }
 }

@@ -1,0 +1,386 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$muted: #64748b;
+$dark: #0f172a;
+$green: #16a34a;
+$red: #dc2626;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40rem;
+}
+
+.spinner {
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0.3rem solid $blue-light;
+  border-top-color: $blue;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.container {
+  max-width: 90rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+  padding-bottom: 10rem; // space for save bar
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+
+  h1 { font-size: 2.2rem; font-weight: 700; color: $dark; }
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  color: $blue;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+
+  &:hover { text-decoration: underline; }
+}
+
+.errorBox {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 0.8rem;
+  padding: 1.2rem 1.6rem;
+  font-size: 1.4rem;
+}
+
+.successBox {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.8rem;
+  padding: 1.2rem 1.6rem;
+  font-size: 1.4rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2.4rem;
+
+  h2 { font-size: 1.8rem; font-weight: 600; color: $dark; margin-bottom: 1.6rem; }
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 1.6rem;
+  align-items: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  label { font-size: 1.3rem; font-weight: 500; color: #374151; }
+
+  input {
+    padding: 0.9rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    outline: none;
+
+    &:focus { border-color: $blue; }
+  }
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.4rem;
+    color: $dark;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+      width: 1.6rem;
+      height: 1.6rem;
+      accent-color: $blue;
+    }
+  }
+}
+
+// Questions
+.questionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 { font-size: 1.8rem; font-weight: 600; color: $dark; }
+}
+
+.btnAdd {
+  background: $blue-light;
+  color: $blue;
+  border: none;
+  padding: 0.9rem 1.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #c7d7f9; }
+}
+
+.emptyQuestions {
+  background: #fff;
+  border: 2px dashed $border;
+  border-radius: 1.2rem;
+  padding: 4.8rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+
+  span { font-size: 4rem; }
+  p { font-size: 1.5rem; color: $muted; }
+}
+
+.questionCard {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  padding: 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.questionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.questionNum {
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06rem;
+  color: $blue;
+}
+
+.questionMeta {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.scoreLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+  color: $muted;
+}
+
+.scoreInput {
+  width: 6rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid $border;
+  border-radius: 0.6rem;
+  font-size: 1.4rem;
+  text-align: center;
+  outline: none;
+
+  &:focus { border-color: $blue; }
+}
+
+.btnRemove {
+  background: none;
+  border: none;
+  color: $muted;
+  font-size: 1.6rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover { color: $red; background: #fee2e2; }
+}
+
+.questionInput {
+  width: 100%;
+  padding: 1.2rem;
+  border: 1px solid $border;
+  border-radius: 0.8rem;
+  font-size: 1.5rem;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+
+  &:focus { border-color: $blue; }
+}
+
+.optionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.optionsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: $dark;
+}
+
+.optionsHint { font-size: 1.2rem; color: $muted; font-weight: 400; }
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1.2rem;
+  border: 1.5px solid $border;
+  border-radius: 0.8rem;
+  transition: border-color 0.15s, background 0.15s;
+
+  &.correctOption {
+    border-color: $green;
+    background: #f0fdf4;
+  }
+}
+
+.radioInput {
+  width: 1.8rem;
+  height: 1.8rem;
+  accent-color: $green;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.optionInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  outline: none;
+  color: $dark;
+
+  &::placeholder { color: #94a3b8; }
+}
+
+.btnRemoveOption {
+  background: none;
+  border: none;
+  color: $muted;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  flex-shrink: 0;
+
+  &:hover { color: $red; }
+}
+
+.btnAddOption {
+  background: none;
+  border: 1px dashed $border;
+  color: $muted;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+
+  &:hover { border-color: $blue; color: $blue; }
+}
+
+// Save bar
+.saveBar {
+  position: fixed;
+  bottom: 0;
+  left: 24rem; // sidebar width
+  right: 0;
+  background: #fff;
+  border-top: 1px solid $border;
+  padding: 1.6rem 3.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 50;
+  box-shadow: 0 -0.4rem 1.6rem rgba(0,0,0,0.06);
+}
+
+.saveInfo { font-size: 1.4rem; color: $muted; }
+
+.saveActions { display: flex; gap: 1.2rem; }
+
+.btnCancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}
+
+.btnSave {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 3.2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.btnPrimary {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}

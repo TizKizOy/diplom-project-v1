@@ -1,37 +1,94 @@
 .header {
-  --bg: #ffffff;
-  --text: #111;
-  --text-hover: #0070f3;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  z-index: 1000;
+}
 
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 64px;
-  background: var(--bg);
-  border-bottom: 1px solid #eaeaea;
-  font-family: system-ui, sans-serif;
 }
 
 .logo {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
   text-decoration: none;
+}
+
+.logoText {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-600);
 }
 
 .nav {
   display: flex;
-  gap: 24px;
+  gap: 1.5rem;
+}
 
-  a {
-    font-size: 15px;
-    color: var(--text);
-    text-decoration: none;
-    transition: color 0.2s;
+.navLink {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--gray-600);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  &:hover {
+    color: var(--primary-600);
+  }
+  &.active {
+    color: var(--primary-600);
+  }
+}
 
-    &:hover {
-      color: var(--text-hover);
-    }
+.userMenu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.userRole {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  background: var(--gray-100);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+}
+
+.loginButton {
+  padding: 0.5rem 1rem;
+  background: var(--primary-600);
+  color: white;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background 0.2s ease;
+  &:hover {
+    background: var(--primary-700);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  .nav {
+    display: none;
+  }
+  .userName {
+    display: none;
   }
 }

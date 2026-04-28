@@ -29,11 +29,11 @@ export class CreateGroupDto {
 
   @ApiPropertyOptional({
     example: 2,
-    description: 'ID куратора (преподавателя), опционально',
+    description: 'ID куратора (преподавателя)',
   })
-  @IsOptional()
   @IsInt()
   @Min(1)
+  @IsOptional()
   @Type(() => Number)
   curatorId?: number;
 }

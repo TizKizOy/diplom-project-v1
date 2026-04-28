@@ -10,16 +10,12 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  Query,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { MaterialsService } from './materials.service';
 import { IMaterial } from './interfaces/materials.interfaces';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwtAuth.guard';
@@ -52,14 +48,12 @@ export class MaterialsController {
   @Get('deleted/list')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Получить удалённые материалы' })
-  @ApiQuery({ name: 'id', required: false, type: Number })
-  async getDeleted(@Query('id') id?: string): Promise<IMaterial[]> {
-    return await this.materialsService.getDeleted(
-      id ? parseInt(id) : undefined,
-    );
+  async getDeleted(): Promise<IMaterial[]> {
+    return await this.materialsService.getDeleted();
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({ summary: 'Получить материал по ID' })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<IMaterial> {
     return await this.materialsService.getById(id);
@@ -68,6 +62,22 @@ export class MaterialsController {
   @Post()
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({ summary: 'Создать материал курса' })
+  @ApiBody({
+    type: CreateMaterialDto,
+    examples: {
+      'Пример создания материала': {
+        value: {
+          courseId: 2,
+          lessonId: 4,
+          typeMaterialId: 4,
+          title: "Лекция 1. Введение в React",
+          description: "В первой лекции будет информация о введение в курс React",
+          sortOrder: 1,
+          isAdditional: false
+        }
+      }
+    }
+  })
   async create(
     @Body() body: CreateMaterialDto,
     @CurrentUser('pkIdUser') adminId: number,
@@ -77,7 +87,7 @@ export class MaterialsController {
 
   @Put(':id')
   @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Обновить материал (частичное обновление)' })
+  @ApiOperation({ summary: 'Обновить материал' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateMaterialDto,
@@ -92,7 +102,7 @@ export class MaterialsController {
   async delete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.materialsService.remove(id, adminId);
   }
 
@@ -102,7 +112,7 @@ export class MaterialsController {
   async restore(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ restored_id: number; message: string }> {
+  ): Promise<IRestoredResult> {
     return await this.materialsService.restore(id, adminId);
   }
 
@@ -113,7 +123,7 @@ export class MaterialsController {
   async hardDelete(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<{ deleted_id: number; message: string }> {
+  ): Promise<IDeletedResult> {
     return await this.materialsService.hardDelete(id, adminId);
   }
 }

@@ -7,6 +7,7 @@ import {
   Min,
   Max,
   Matches,
+  IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -15,12 +16,12 @@ export class CreateUserDto {
   @ApiProperty({
     description: 'Полное имя пользователя',
     example: 'Иванов Иван Иванович',
-    minLength: 3,
-    maxLength: 30,
+    minLength: 5,
+    maxLength: 99,
   })
-  @IsString({ message: 'Необходимо передать строковое ФИО' })
-  @MinLength(3, { message: 'ФИО минимум 3 символа' })
-  @MaxLength(30, { message: 'ФИО максимум 30 символов' })
+  @IsString({ message: 'Необходимо передать ФИО' })
+  @MinLength(5, { message: 'ФИО минимум 5 символа' })
+  @MaxLength(99, { message: 'ФИО максимум 99 символов' })
   fullName: string;
 
   @ApiProperty({
@@ -28,7 +29,7 @@ export class CreateUserDto {
     example: 'ivanov_i',
     pattern: '^[a-zA-Z0-9_.-]+$',
   })
-  @IsString({ message: 'Необходимо передать строковый Логин' })
+  @IsString({ message: 'Необходимо передать Логин' })
   @MinLength(3, { message: 'Логин минимум 3 символа' })
   @MaxLength(30, { message: 'Логин максимум 30 символов' })
   @Matches(/^[a-zA-Z0-9_.-]+$/, {
@@ -79,4 +80,18 @@ export class CreateUserDto {
   @Max(3, { message: 'ID роли ≤ 3' })
   @Type(() => Number)
   roleId: number;
+
+  @ApiProperty({
+    description: `ID должности: 1-Учитель информатики, 2-Учитель математики... 8-Методист`,
+    example: 3,
+    minimum: 1,
+    maximum: 8,
+    enum: [1, 2, 3, 4, 5, 6, 7, 8],
+  })
+  @IsOptional()
+  @IsInt({ message: 'ID должности должно быть числом' })
+  @Min(1, { message: 'ID должности ≥ 1' })
+  @Max(8, { message: 'ID должности ≤ 8' })
+  @Type(() => Number)
+  positionId?: number;
 }

@@ -1,0 +1,351 @@
+// 1rem = 10px
+$blue: #1a56db;
+$blue-light: #e8f0fe;
+$border: #e2e8f0;
+$text-muted: #64748b;
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2.4rem;
+  height: calc(100vh - 6.4rem);
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
+}
+
+.btnNew {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 0.9rem 2rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 30rem 1fr;
+  gap: 0;
+  flex: 1;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+// Sidebar
+.sidebar {
+  border-right: 1px solid $border;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 2.4rem;
+  color: $text-muted;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.dialogItem {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.4rem 1.6rem;
+  cursor: pointer;
+  border-bottom: 1px solid $border;
+  transition: background 0.15s;
+
+  &:hover { background: #f8fafc; }
+  &.activeDialog { background: $blue-light; }
+}
+
+.dialogAvatar {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: $blue;
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dialogInfo { flex: 1; min-width: 0; }
+
+.dialogTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+
+  strong { font-size: 1.4rem; color: #0f172a; }
+}
+
+.dialogTime { font-size: 1.2rem; color: $text-muted; }
+
+.dialogBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.dialogPreview {
+  font-size: 1.3rem;
+  color: $text-muted;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.unreadBadge {
+  background: $blue;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 2rem;
+  flex-shrink: 0;
+}
+
+// Chat
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chatEmpty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  color: $text-muted;
+
+  span { font-size: 4rem; }
+  p { font-size: 1.4rem; }
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.4rem 2rem;
+  border-bottom: 1px solid $border;
+  flex-shrink: 0;
+
+  strong { font-size: 1.5rem; color: #0f172a; }
+}
+
+.chatAvatar {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: $blue;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.6rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+
+  &.mine {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  &.theirs {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
+}
+
+.msgBubble {
+  padding: 1rem 1.4rem;
+  border-radius: 1.2rem;
+  font-size: 1.4rem;
+  line-height: 1.5;
+
+  .mine & {
+    background: $blue;
+    color: #fff;
+    border-bottom-right-radius: 0.4rem;
+  }
+
+  .theirs & {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-bottom-left-radius: 0.4rem;
+  }
+}
+
+.msgTime {
+  font-size: 1.1rem;
+  color: $text-muted;
+  margin-top: 0.3rem;
+}
+
+.replyForm {
+  display: flex;
+  gap: 1rem;
+  padding: 1.2rem 1.6rem;
+  border-top: 1px solid $border;
+  flex-shrink: 0;
+}
+
+.replyInput {
+  flex: 1;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid $border;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+
+  &:focus { border-color: $blue; }
+}
+
+.btnSend {
+  background: $blue;
+  color: #fff;
+  border: none;
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+// New message form
+.newMsgForm {
+  padding: 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.newMsgHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 { font-size: 1.8rem; font-weight: 600; color: #0f172a; }
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 2.4rem;
+  color: $text-muted;
+  cursor: pointer;
+  line-height: 1;
+
+  &:hover { color: #0f172a; }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  span { font-size: 1.3rem; font-weight: 500; color: #374151; }
+
+  select, textarea {
+    padding: 0.9rem 1.2rem;
+    border: 1px solid $border;
+    border-radius: 0.8rem;
+    font-size: 1.4rem;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.15s;
+
+    &:focus { border-color: $blue; }
+  }
+
+  textarea { resize: vertical; }
+}
+
+.errorText { font-size: 1.3rem; color: #dc2626; }
+
+.newMsgActions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btnPrimary {
+  background: $blue;
+  color: #fff;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #1e429f; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.btnCancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 1rem 2.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #e2e8f0; }
+}

@@ -1,14 +1,12 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import * as db from './db/tasks.db';
-import {
-  ITask,
-  IDeletedTaskResult,
-  IRestoredTaskResult,
-} from './interfaces/tasks.interface';
+import { ITask } from './interfaces/tasks.interface';
+import { IDeletedResult } from '../common/interfaces/delete.interfaces';
+import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
@@ -16,18 +14,19 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 export class TasksService {
   async getTasks(filter: {
     id?: number;
+    typeTaskId?: number;
     courseId?: number;
-    typeId?: number;
+    lessonId?: number;
+    taskTitle?: string;
+    isDeleted?: boolean;
   }): Promise<ITask[]> {
     const tasks = await db.getTasks(filter);
-    if (!tasks || tasks.length === 0) {
-      throw new NotFoundException('Задания не найдены');
-    }
-    return tasks;
+    return tasks || [];
   }
 
-  async getAll(): Promise<ITask[]> {
-    return await this.getTasks({});
+  async getAll(): Promise<any[]> {
+    const result = await db.getTasks({});
+    return result || [];
   }
 
   async getById(id: number): Promise<ITask> {
@@ -43,12 +42,15 @@ export class TasksService {
     return await this.getTasks({ courseId });
   }
 
-  async getByType(typeId: number): Promise<ITask[]> {
-    return await this.getTasks({ typeId });
+  async getByType(typeTaskId: number): Promise<ITask[]> {
+    return await this.getTasks({ typeTaskId });
   }
 
-  async getByCourseAndType(courseId: number, typeId: number): Promise<ITask[]> {
-    return await this.getTasks({ courseId, typeId });
+  async getByCourseAndType(
+    courseId: number,
+    typeTaskId: number,
+  ): Promise<ITask[]> {
+    return await this.getTasks({ courseId, typeTaskId });
   }
 
   async getDeleted(): Promise<ITask[]> {
@@ -63,10 +65,7 @@ export class TasksService {
     try {
       return await db.createTask(dto, adminId);
     } catch (e: any) {
-      if (e.message?.includes('уже существует')) {
-        throw new BadRequestException(e.message);
-      }
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
+      if (e.message && e.message.includes('уже существует')) {
         throw new BadRequestException(e.message);
       }
       throw new BadRequestException(e.message || 'Ошибка создания задания');
@@ -78,48 +77,38 @@ export class TasksService {
     dto: UpdateTaskDto,
     adminId: number,
   ): Promise<ITask> {
+    await this.getById(id);
     try {
-      await this.getById(id);
       return await db.updateTask(id, dto, adminId);
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-      if (e.message?.includes('уже существует')) {
+      if (e.message && e.message.includes('уже существует')) {
         throw new BadRequestException(e.message);
       }
-      if (e.message?.includes('не найден') || e.message?.includes('удалён')) {
-        throw new BadRequestException(e.message);
-      }
-      throw new BadRequestException(e.message || 'Ошибка обновления задания');
+      throw new BadRequestException(e.message || 'Ошибка создания задания');
     }
   }
 
-  async remove(id: number, adminId: number): Promise<IDeletedTaskResult> {
+  async remove(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       const result = await db.deleteTask(id, adminId);
-      if (result.deleted_id === 0) {
+      if (result.deletedId === 0) {
         throw new NotFoundException(result.message);
       }
       return result;
     } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
       throw new BadRequestException(e.message);
     }
   }
 
-  async restore(id: number, adminId: number): Promise<IRestoredTaskResult> {
+  async restore(id: number, adminId: number): Promise<IRestoredResult> {
     try {
       return await db.restoreTask(id, adminId);
     } catch (e: any) {
-      if (e.message?.includes('курс удалён')) {
-        throw new BadRequestException(
-          'Невозможно восстановить: курс удалён. Сначала восстановите курс.',
-        );
-      }
       throw new BadRequestException(e.message);
     }
   }
 
-  async hardDelete(id: number, adminId: number): Promise<IDeletedTaskResult> {
+  async hardDelete(id: number, adminId: number): Promise<IDeletedResult> {
     try {
       return await db.hardDeleteTask(id, adminId);
     } catch (e: any) {
