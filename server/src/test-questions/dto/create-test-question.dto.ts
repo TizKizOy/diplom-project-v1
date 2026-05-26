@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsInt,
   Min,
+  Max,
   IsBoolean,
   IsOptional,
 } from 'class-validator';
@@ -47,12 +48,13 @@ export class CreateTestQuestionDto {
     description: 'Балл за вопрос',
     example: 1,
     default: 1,
-    minimum: 1,
+    minimum: 0,
     required: false,
   })
   @IsOptional()
   @IsInt({ message: 'Балл должен быть числом' })
-  @Min(1, { message: 'Балл ≥ 1' })
+  @Min(0, { message: 'Балл ≥ 0' })
+  @Max(1000, { message: 'Балл ≤ 1000' })
   @Type(() => Number)
   score?: number;
 }

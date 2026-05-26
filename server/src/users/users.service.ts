@@ -30,6 +30,11 @@ export class UsersService {
     return await this.getUsers({});
   }
 
+  async getMessagingContacts(userId: number, roleName: string): Promise<IUser[]> {
+    const rows = await db.getMessagingContacts(userId, roleName);
+    return rows || [];
+  }
+
   async getById(id: number): Promise<IUser> {
     const users = await db.getUsers({ id });
     const user = users[0];

@@ -1,13 +1,12 @@
 import Link from 'next/link';
 import styles from './page.module.scss';
-import arrowSvg from '../../../public/Arrow.svg';
 
 export default function HomePage() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.logo}>МГИРО</h1>
-        <Link href="/auth" className={styles.profileButton}>
+        <Link href="/auth/login" className={styles.profileButton}>
           Войти
         </Link>
       </header>

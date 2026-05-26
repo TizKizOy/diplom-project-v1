@@ -1,22 +1,35 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { coursesApi } from '@/lib/api/courses.api';
 import { usersApi } from '@/lib/api/users.api';
-import { groupsApi } from '@/lib/api/groups.api';
-import { attemptsApi } from '@/lib/api/attempts.api';
 import { certificatesApi } from '@/lib/api/certificates.api';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
+import { groupsApi } from '@/lib/api/groups.api';
 import { groupListenersApi } from '@/lib/api/groupListeners.api';
-import type { ICourse, IUser } from '@/lib/types';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { attemptsApi } from '@/lib/api/attempts.api';
+import type { ICourse, IUser, IGroup } from '@/lib/types';
+import type { IGroupListener } from '@/lib/api/groupListeners.api';
+import type { IAttempt } from '@/lib/api/attempts.api';
+import { downloadTableDocx } from '@/lib/export/downloadTableDocx';
+import { downloadFormattedTableXlsx } from '@/lib/export/downloadFormattedXlsx';
+import { exportHtmlTableToPdf } from '@/lib/export/htmlTableToPdf';
+import {
+  AttemptsByCourseChart,
+  AttemptsStatusPieChart,
+  CoursesListenersChart,
+} from '@/components/reports/ReportCharts';
 import styles from './page.module.scss';
 
-type ReportType = 'courses' | 'certificates' | 'teachers' | 'period';
+type ReportType =
+  | 'courses'
+  | 'certificates'
+  | 'teachers'
+  | 'period'
+  | 'enrollments'
+  | 'attempts';
 
 export default function ReportsPage() {
-  const initialized = useRef(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [activeReport, setActiveReport] = useState<ReportType>('courses');
@@ -24,10 +37,11 @@ export default function ReportsPage() {
   // Data
   const [courses, setCourses] = useState<ICourse[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
-  const [attempts, setAttempts] = useState<any[]>([]);
   const [certificates, setCertificates] = useState<any[]>([]);
   const [courseTeachers, setCourseTeachers] = useState<any[]>([]);
-  const [groupListeners, setGroupListeners] = useState<any[]>([]);
+  const [groups, setGroups] = useState<IGroup[]>([]);
+  const [groupListeners, setGroupListeners] = useState<IGroupListener[]>([]);
+  const [attempts, setAttempts] = useState<IAttempt[]>([]);
 
   // Filters
   const [filterStatus, setFilterStatus] = useState('');
@@ -37,33 +51,44 @@ export default function ReportsPage() {
   const [filterCourse, setFilterCourse] = useState('');
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadAll();
   }, []);
 
   const loadAll = async () => {
     try {
-      const [c, u, a, cert, ct, gl] = await Promise.allSettled([
+      const [c, u, cert, ct, g, gl, att] = await Promise.allSettled([
         coursesApi.getAll(),
         usersApi.getAll(),
-        attemptsApi.getAll(),
         certificatesApi.getAll(),
-        courseTeachersApi.getAll ? courseTeachersApi.getAll() : Promise.resolve([]),
+        courseTeachersApi.getAll(),
+        groupsApi.getAll(),
         groupListenersApi.getAll(),
+        attemptsApi.getAll(),
       ]);
       if (c.status === 'fulfilled') setCourses(c.value);
       if (u.status === 'fulfilled') setUsers(u.value);
-      if (a.status === 'fulfilled') setAttempts(a.value);
       if (cert.status === 'fulfilled') setCertificates(cert.value);
       if (ct.status === 'fulfilled') setCourseTeachers(ct.value);
+      if (g.status === 'fulfilled') setGroups(g.value);
       if (gl.status === 'fulfilled') setGroupListeners(gl.value);
+      if (att.status === 'fulfilled') setAttempts(att.value);
     } finally {
       setLoading(false);
     }
   };
 
   const teachers = users.filter((u) => u.roleName === 'Преподаватель');
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('ru-RU');
+  };
+
+  const courseMetrics = (courseId: number) => {
+    const gs = groups.filter((g) => g.fkIdCourse === courseId);
+    const listeners = gs.reduce((s, g) => s + (g.listenerCount || 0), 0);
+    return { groupCount: gs.length, listeners };
+  };
 
   // ---- Filtered data per report ----
   const getCoursesReport = () => {
@@ -88,160 +113,340 @@ export default function ReportsPage() {
 
   const getPeriodReport = () => {
     let data = [...courses];
+    if (filterStatus) data = data.filter((c) => c.statusName === filterStatus);
     if (filterDateFrom) data = data.filter((c) => new Date(c.startDate) >= new Date(filterDateFrom));
     if (filterDateTo) data = data.filter((c) => new Date(c.endDate) <= new Date(filterDateTo));
     return data;
   };
 
-  // ---- Export helpers ----
-  const exportToCSV = (headers: string[], rows: string[][], filename: string) => {
-    const BOM = '\uFEFF';
-    const csvContent = BOM + [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(';')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const getEnrollmentsReport = () => {
+    let data = [...groupListeners];
+    if (filterCourse) data = data.filter((x) => String(x.fkIdCourse ?? '') === filterCourse);
+    return data;
   };
 
-  const exportToWord = (title: string, headers: string[], rows: string[][], filename: string) => {
-    const tableRows = rows.map((r) =>
-      `<tr>${r.map((c) => `<td style="border:1px solid #ccc;padding:6px 10px;font-size:12px">${c}</td>`).join('')}</tr>`
-    ).join('');
-    const html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
-      <head><meta charset="utf-8"><title>${title}</title>
-      <style>body{font-family:Arial,sans-serif;margin:2cm} h1{font-size:16pt;margin-bottom:8pt} p{font-size:10pt;color:#666;margin-bottom:16pt} table{border-collapse:collapse;width:100%} th{background:#1a56db;color:#fff;padding:8px 10px;font-size:11px;text-align:left} td{border:1px solid #ddd;padding:6px 10px;font-size:11px}</style>
-      </head><body>
-      <h1>${title}</h1>
-      <p>Сформирован: ${new Date().toLocaleString('ru-RU')}</p>
-      <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
-      <tbody>${tableRows}</tbody></table>
-      </body></html>`;
-    const blob = new Blob(['\uFEFF' + html], { type: 'application/msword;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  type AttemptCourseAgg = {
+    courseId: number;
+    title: string;
+    total: number;
+    pending: number;
+    accepted: number;
+    rejected: number;
+    rework: number;
+    avgAccepted: string;
   };
 
-  const exportToPDF = (title: string, headers: string[], rows: string[][], filename: string) => {
-    const doc = new jsPDF('l', 'mm', 'a4');
-    doc.setFont('helvetica');
-    doc.setFontSize(14);
-    doc.text(title, 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Сформирован: ${new Date().toLocaleString('ru-RU')}`, 14, 23);
-    autoTable(doc, {
-      head: [headers],
-      body: rows,
-      startY: 28,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [26, 86, 219], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
-    });
-    doc.save(filename);
+  const getAttemptsCourseSummary = (): AttemptCourseAgg[] => {
+    type Acc = {
+      title: string;
+      total: number;
+      pending: number;
+      accepted: number;
+      rejected: number;
+      rework: number;
+      scoreSum: number;
+      scoreN: number;
+    };
+    const map = new Map<number, Acc>();
+    const titleOf = (cid: number) => courses.find((c) => c.pkIdCourse === cid)?.title ?? `Курс #${cid}`;
+
+    for (const a of attempts) {
+      const cid = a.fkIdCourse != null ? Number(a.fkIdCourse) : NaN;
+      if (!Number.isFinite(cid)) continue;
+      let acc = map.get(cid);
+      if (!acc) {
+        acc = {
+          title: titleOf(cid),
+          total: 0,
+          pending: 0,
+          accepted: 0,
+          rejected: 0,
+          rework: 0,
+          scoreSum: 0,
+          scoreN: 0,
+        };
+        map.set(cid, acc);
+      }
+      acc.total += 1;
+      const s = a.statusName || '';
+      if (s === 'На проверке') acc.pending += 1;
+      else if (s === 'Принято') {
+        acc.accepted += 1;
+        const sc = Number(a.score);
+        if (Number.isFinite(sc)) {
+          acc.scoreSum += sc;
+          acc.scoreN += 1;
+        }
+      } else if (s === 'Отклонено') acc.rejected += 1;
+      else if (s === 'На доработке') acc.rework += 1;
+    }
+
+    let rows: AttemptCourseAgg[] = [...map.entries()]
+      .filter(([, v]) => v.total > 0)
+      .map(([courseId, v]) => ({
+        courseId,
+        title: v.title,
+        total: v.total,
+        pending: v.pending,
+        accepted: v.accepted,
+        rejected: v.rejected,
+        rework: v.rework,
+        avgAccepted: v.scoreN > 0 ? (v.scoreSum / v.scoreN).toFixed(1) : '—',
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    if (filterCourse) {
+      rows = rows.filter((r) => String(r.courseId) === filterCourse);
+    }
+    return rows;
+  };
+
+  const exportToPDF = async (
+    title: string,
+    headers: string[],
+    rows: string[][],
+    filename: string,
+  ) => {
+    await exportHtmlTableToPdf(title, headers, rows, filename);
   };
 
   // ---- Report 1: Courses ----
-  const handleCoursesExport = (format: 'pdf' | 'csv' | 'word') => {
+  const handleCoursesExport = async (format: 'pdf' | 'xlsx' | 'word') => {
     setGenerating(true);
-    const data = getCoursesReport();
-    const headers = ['№', 'Название', 'Статус', 'Дата начала', 'Дата окончания', 'Теги'];
-    const rows = data.map((c, i) => [
-      String(i + 1), c.title, c.statusName,
-      c.startDate ? new Date(c.startDate).toLocaleDateString('ru-RU') : '—',
-      c.endDate ? new Date(c.endDate).toLocaleDateString('ru-RU') : '—',
-      c.tags || '—',
-    ]);
-    if (format === 'pdf') exportToPDF('Отчёт по курсам', headers, rows, 'report-courses.pdf');
-    else if (format === 'word') exportToWord('Отчёт по курсам', headers, rows, 'report-courses.doc');
-    else exportToCSV(headers, rows, 'report-courses.csv');
-    setGenerating(false);
+    try {
+      const data = getCoursesReport();
+      const headers = ['№', 'Название', 'Статус', 'Групп', 'Слушателей', 'Дата начала', 'Дата окончания', 'Теги'];
+      const rows = data.map((c, i) => {
+        const m = courseMetrics(c.pkIdCourse);
+        return [
+          String(i + 1),
+          c.title,
+          c.statusName,
+          String(m.groupCount),
+          String(m.listeners),
+          formatDate(c.startDate),
+          formatDate(c.endDate),
+          c.tags || '—',
+        ];
+      });
+      if (format === 'pdf') await exportToPDF('Отчёт по курсам', headers, rows, 'report-courses.pdf');
+      else if (format === 'word') await downloadTableDocx('Отчёт по курсам', headers, rows, 'report-courses.docx');
+      else await downloadFormattedTableXlsx('Отчёт по курсам', headers, rows, 'report-courses.xlsx', 'Курсы');
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  // ---- Report 2: Certificates ----
-  const handleCertificatesExport = (format: 'pdf' | 'csv' | 'word') => {
+  const handleEnrollmentsExport = async (format: 'pdf' | 'xlsx' | 'word') => {
     setGenerating(true);
-    const data = getCertificatesReport();
-    const headers = ['№', 'Слушатель', 'Курс', 'Шаблон', 'Дата выдачи'];
-    const rows = data.map((c: any, i: number) => [
-      String(i + 1), c.listenerName || '—', c.courseTitle || '—', c.templateName || '—',
-      c.issuedAt ? new Date(c.issuedAt).toLocaleDateString('ru-RU') : '—',
-    ]);
-    if (format === 'pdf') exportToPDF('Отчёт по сертификатам', headers, rows, 'report-certificates.pdf');
-    else if (format === 'word') exportToWord('Отчёт по сертификатам', headers, rows, 'report-certificates.doc');
-    else exportToCSV(headers, rows, 'report-certificates.csv');
-    setGenerating(false);
+    try {
+      const data = getEnrollmentsReport();
+      const headers = ['№', 'Курс', 'Группа', 'Слушатель', 'E-mail'];
+      const rows = data.map((r, i) => [
+        String(i + 1),
+        r.courseTitle || '—',
+        r.groupName || '—',
+        r.listenerName || '—',
+        r.email || '—',
+      ]);
+      if (format === 'pdf') await exportToPDF('Запись слушателей в группы (учебный процесс)', headers, rows, 'report-enrollments.pdf');
+      else if (format === 'word') await downloadTableDocx('Запись слушателей в группы', headers, rows, 'report-enrollments.docx');
+      else await downloadFormattedTableXlsx('Запись слушателей в группы', headers, rows, 'report-enrollments.xlsx', 'Записи');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleAttemptsExport = async (format: 'pdf' | 'xlsx' | 'word') => {
+    setGenerating(true);
+    try {
+      const data = getAttemptsCourseSummary();
+      const headers = [
+        '№',
+        'Курс',
+        'Всего попыток',
+        'На проверке',
+        'Принято',
+        'Отклонено',
+        'На доработке',
+        'Ср. балл (принятые)',
+      ];
+      const rows = data.map((r, i) => [
+        String(i + 1),
+        r.title,
+        String(r.total),
+        String(r.pending),
+        String(r.accepted),
+        String(r.rejected),
+        String(r.rework),
+        r.avgAccepted,
+      ]);
+      if (format === 'pdf') await exportToPDF('Сводка по проверке заданий (попытки по курсам)', headers, rows, 'report-attempts-summary.pdf');
+      else if (format === 'word') await downloadTableDocx('Сводка по попыткам', headers, rows, 'report-attempts-summary.docx');
+      else await downloadFormattedTableXlsx('Сводка по попыткам', headers, rows, 'report-attempts-summary.xlsx', 'Попытки');
+    } finally {
+      setGenerating(false);
+    }
+  };
+  const handleCertificatesExport = async (format: 'pdf' | 'xlsx' | 'word') => {
+    setGenerating(true);
+    try {
+      const data = getCertificatesReport();
+      const headers = ['№', 'Слушатель', 'Курс', 'Шаблон', 'Дата выдачи'];
+      const rows = data.map((c: any, i: number) => [
+        String(i + 1), c.listenerName || '—', c.courseTitle || '—', c.templateName || '—',
+        formatDate(c.issuedAt),
+      ]);
+      if (format === 'pdf') await exportToPDF('Отчёт по сертификатам', headers, rows, 'report-certificates.pdf');
+      else if (format === 'word') await downloadTableDocx('Отчёт по сертификатам', headers, rows, 'report-certificates.docx');
+      else await downloadFormattedTableXlsx('Отчёт по сертификатам', headers, rows, 'report-certificates.xlsx', 'Сертификаты');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   // ---- Report 3: Teachers ----
-  const handleTeachersExport = (format: 'pdf' | 'csv' | 'word') => {
+  const handleTeachersExport = async (format: 'pdf' | 'xlsx' | 'word') => {
     setGenerating(true);
-    const data = getTeachersReport();
-    const headers = ['№', 'Преподаватель', 'Курс', 'Дата назначения'];
-    const rows = data.map((ct: any, i: number) => [
-      String(i + 1), ct.teacherName || '—', ct.courseTitle || '—',
-      ct.assignedAt ? new Date(ct.assignedAt).toLocaleDateString('ru-RU') : '—',
-    ]);
-    if (format === 'pdf') exportToPDF('Отчёт по преподавателям', headers, rows, 'report-teachers.pdf');
-    else if (format === 'word') exportToWord('Отчёт по преподавателям', headers, rows, 'report-teachers.doc');
-    else exportToCSV(headers, rows, 'report-teachers.csv');
-    setGenerating(false);
+    try {
+      const data = getTeachersReport();
+      const headers = ['№', 'Преподаватель', 'Курс', 'Дата назначения'];
+      const rows = data.map((ct: any, i: number) => [
+        String(i + 1), ct.teacherName || '—', ct.courseTitle || '—',
+        ct.assignedAt ? new Date(ct.assignedAt).toLocaleDateString('ru-RU') : '—',
+      ]);
+      if (format === 'pdf') await exportToPDF('Отчёт по преподавателям', headers, rows, 'report-teachers.pdf');
+      else if (format === 'word') await downloadTableDocx('Отчёт по преподавателям', headers, rows, 'report-teachers.docx');
+      else await downloadFormattedTableXlsx('Отчёт по преподавателям', headers, rows, 'report-teachers.xlsx', 'Преподаватели');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   // ---- Report 4: Period ----
-  const handlePeriodExport = (format: 'pdf' | 'csv' | 'word') => {
+  const handlePeriodExport = async (format: 'pdf' | 'xlsx' | 'word') => {
     setGenerating(true);
-    const data = getPeriodReport();
-    const headers = ['№', 'Название', 'Статус', 'Начало', 'Окончание', 'Продолжительность (дней)'];
-    const rows = data.map((c, i) => {
-      const days = c.startDate && c.endDate
-        ? String(Math.ceil((new Date(c.endDate).getTime() - new Date(c.startDate).getTime()) / 86400000))
-        : '—';
-      return [
-        String(i + 1), c.title, c.statusName,
-        c.startDate ? new Date(c.startDate).toLocaleDateString('ru-RU') : '—',
-        c.endDate ? new Date(c.endDate).toLocaleDateString('ru-RU') : '—',
-        days,
-      ];
-    });
-    if (format === 'pdf') exportToPDF('Отчёт по периодам', headers, rows, 'report-period.pdf');
-    else if (format === 'word') exportToWord('Отчёт по периодам', headers, rows, 'report-period.doc');
-    else exportToCSV(headers, rows, 'report-period.csv');
-    setGenerating(false);
+    try {
+      const data = getPeriodReport();
+      const headers = ['№', 'Название', 'Статус', 'Начало', 'Окончание', 'Продолжительность (дней)'];
+      const rows = data.map((c, i) => {
+        const days = c.startDate && c.endDate
+          ? String(Math.ceil((new Date(c.endDate).getTime() - new Date(c.startDate).getTime()) / 86400000))
+          : '—';
+        return [
+          String(i + 1), c.title, c.statusName,
+          formatDate(c.startDate),
+          formatDate(c.endDate),
+          days,
+        ];
+      });
+      if (format === 'pdf') await exportToPDF('Отчёт по периодам', headers, rows, 'report-period.pdf');
+      else if (format === 'word') await downloadTableDocx('Отчёт по периодам', headers, rows, 'report-period.docx');
+      else await downloadFormattedTableXlsx('Отчёт по периодам', headers, rows, 'report-period.xlsx', 'Периоды');
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const handleExport = (format: 'pdf' | 'csv' | 'word') => {
-    if (activeReport === 'courses') handleCoursesExport(format);
-    else if (activeReport === 'certificates') handleCertificatesExport(format);
-    else if (activeReport === 'teachers') handleTeachersExport(format);
-    else if (activeReport === 'period') handlePeriodExport(format);
+  const handleExport = async (format: 'pdf' | 'xlsx' | 'word') => {
+    if (activeReport === 'courses') await handleCoursesExport(format);
+    else if (activeReport === 'certificates') await handleCertificatesExport(format);
+    else if (activeReport === 'teachers') await handleTeachersExport(format);
+    else if (activeReport === 'period') await handlePeriodExport(format);
+    else if (activeReport === 'enrollments') await handleEnrollmentsExport(format);
+    else if (activeReport === 'attempts') await handleAttemptsExport(format);
   };
 
-  const getPreviewData = () => {
+  const previewCount = () => getPreviewRows().length;
+
+  const getPreviewRows = (): unknown[] => {
     if (activeReport === 'courses') return getCoursesReport();
     if (activeReport === 'certificates') return getCertificatesReport();
     if (activeReport === 'teachers') return getTeachersReport();
-    return getPeriodReport();
+    if (activeReport === 'period') return getPeriodReport();
+    if (activeReport === 'enrollments') return getEnrollmentsReport();
+    return getAttemptsCourseSummary();
   };
 
   if (loading) return <div className={styles.loading}>Загрузка данных...</div>;
 
   const REPORT_TABS = [
-    { id: 'courses' as ReportType, label: 'По курсам' },
-    { id: 'certificates' as ReportType, label: 'По сертификатам' },
-    { id: 'teachers' as ReportType, label: 'По преподавателям' },
-    { id: 'period' as ReportType, label: 'По периодам' },
+    { id: 'courses' as ReportType, label: 'Курсы и охват' },
+    { id: 'enrollments' as ReportType, label: 'Запись в группы' },
+    { id: 'attempts' as ReportType, label: 'Проверка заданий' },
+    { id: 'certificates' as ReportType, label: 'Сертификаты' },
+    { id: 'teachers' as ReportType, label: 'Преподаватели' },
+    { id: 'period' as ReportType, label: 'Периоды обучения' },
   ];
+
+  const summaryForTab = () => {
+    if (activeReport === 'courses') {
+      const list = getCoursesReport();
+      const pub = list.filter((c) => c.statusName === 'Опубликован').length;
+      const groupsN = new Set(list.flatMap((c) => groups.filter((g) => g.fkIdCourse === c.pkIdCourse).map((g) => g.pkIdGroup))).size;
+      const listeners = list.reduce((s, c) => s + courseMetrics(c.pkIdCourse).listeners, 0);
+      return [
+        { label: 'Курсов в выборке', value: String(list.length) },
+        { label: 'Опубликовано', value: String(pub) },
+        { label: 'Групп (уник.)', value: String(groupsN) },
+        { label: 'Слушателей по группам', value: String(listeners) },
+      ];
+    }
+    if (activeReport === 'enrollments') {
+      const list = getEnrollmentsReport();
+      const coursesN = new Set(list.map((x) => x.fkIdCourse).filter(Boolean)).size;
+      return [
+        { label: 'Записей', value: String(list.length) },
+        { label: 'Курсов', value: String(coursesN) },
+      ];
+    }
+    if (activeReport === 'attempts') {
+      const list = getAttemptsCourseSummary();
+      const tot = list.reduce((s, r) => s + r.total, 0);
+      const pend = list.reduce((s, r) => s + r.pending, 0);
+      const ok = list.reduce((s, r) => s + r.accepted, 0);
+      return [
+        { label: 'Курсов с попытками', value: String(list.length) },
+        { label: 'Всего попыток', value: String(tot) },
+        { label: 'На проверке', value: String(pend) },
+        { label: 'Принято', value: String(ok) },
+      ];
+    }
+    if (activeReport === 'certificates') {
+      const list = getCertificatesReport();
+      return [
+        { label: 'Сертификатов', value: String(list.length) },
+        { label: 'Курсов (уник.)', value: String(new Set(list.map((c: any) => c.fkIdCourse ?? c.courseTitle)).size) },
+      ];
+    }
+    if (activeReport === 'teachers') {
+      const list = getTeachersReport();
+      const teachersN = new Set(list.map((ct: any) => ct.fkIdTeacher)).size;
+      return [
+        { label: 'Назначений', value: String(list.length) },
+        { label: 'Преподавателей', value: String(teachersN) },
+      ];
+    }
+    const list = getPeriodReport();
+    const withDates = list.filter((c) => c.startDate && c.endDate);
+    const sumDays = withDates.reduce((s, c) => {
+      return s + Math.ceil((new Date(c.endDate!).getTime() - new Date(c.startDate!).getTime()) / 86400000);
+    }, 0);
+    const avgDays = withDates.length > 0 ? Math.round(sumDays / withDates.length) : null;
+    return [
+      { label: 'Курсов в периоде', value: String(list.length) },
+      { label: 'Средняя длительность, дн.', value: avgDays != null ? String(avgDays) : '—' },
+    ];
+  };
 
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Отчёты</h1>
+      <p className={styles.lead}>
+        Разделы отражают разные стороны учебного процесса: охват курсов, фактическую запись в группы,
+        нагрузку по проверке заданий, выдачу сертификатов, назначения преподавателей и календарные периоды.
+        Сводные карточки считаются по текущим фильтрам; экспорт сохраняет то же содержимое, что предпросмотр.
+      </p>
 
       {/* Report type tabs */}
       <div className={styles.tabs}>
@@ -253,6 +458,15 @@ export default function ReportsPage() {
           >
             {t.label}
           </button>
+        ))}
+      </div>
+
+      <div className={styles.summaryStrip}>
+        {summaryForTab().map((s) => (
+          <div key={s.label} className={styles.summaryCard}>
+            <div className={styles.summaryValue}>{s.value}</div>
+            <div className={styles.summaryLabel}>{s.label}</div>
+          </div>
         ))}
       </div>
 
@@ -281,7 +495,7 @@ export default function ReportsPage() {
               </div>
             </>
           )}
-          {activeReport === 'certificates' && (
+          {(activeReport === 'certificates' || activeReport === 'enrollments' || activeReport === 'attempts') && (
             <div className={styles.filterGroup}>
               <label>Курс</label>
               <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}>
@@ -312,19 +526,65 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {activeReport === 'courses' && getCoursesReport().length > 0 && (
+        <div className={styles.chartCard}>
+          <h3 className={styles.chartTitle}>Охват слушателями по курсам</h3>
+          <p className={styles.chartHint}>
+            Число слушателей, записанных в группы каждого курса (по текущим фильтрам).
+          </p>
+          <CoursesListenersChart
+            data={getCoursesReport().map((c) => ({
+              name: c.title.length > 42 ? `${c.title.slice(0, 40)}…` : c.title,
+              listeners: courseMetrics(c.pkIdCourse).listeners,
+            }))}
+          />
+        </div>
+      )}
+
+      {activeReport === 'attempts' && getAttemptsCourseSummary().length > 0 && (
+        <div className={styles.chartsRow}>
+          <div className={styles.chartCard}>
+            <h3 className={styles.chartTitle}>Статусы попыток (сводно)</h3>
+            <p className={styles.chartHint}>Доля сдач по всем курсам в выборке.</p>
+            <AttemptsStatusPieChart
+              data={getAttemptsCourseSummary().map((r) => ({
+                name: r.title,
+                pending: r.pending,
+                accepted: r.accepted,
+                rejected: r.rejected,
+                rework: r.rework,
+              }))}
+            />
+          </div>
+          <div className={styles.chartCard}>
+            <h3 className={styles.chartTitle}>Попытки по курсам</h3>
+            <p className={styles.chartHint}>Стек: принято, на проверке, доработка, отклонено.</p>
+            <AttemptsByCourseChart
+              data={getAttemptsCourseSummary().map((r) => ({
+                name: r.title.length > 28 ? `${r.title.slice(0, 26)}…` : r.title,
+                pending: r.pending,
+                accepted: r.accepted,
+                rejected: r.rejected,
+                rework: r.rework,
+              }))}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Preview table */}
       <div className={styles.previewCard}>
         <div className={styles.previewHeader}>
-          <h2>Предпросмотр <span className={styles.count}>({getPreviewData().length} записей)</span></h2>
+          <h2>Предпросмотр <span className={styles.count}>({previewCount()} записей)</span></h2>
           <div className={styles.exportBtns}>
-            <button className={styles.btnPDF} onClick={() => handleExport('pdf')} disabled={generating || getPreviewData().length === 0}>
+            <button className={styles.btnPDF} onClick={() => void handleExport('pdf')} disabled={generating || previewCount() === 0}>
               {generating ? '...' : '↓ PDF'}
             </button>
-            <button className={styles.btnCSV} onClick={() => handleExport('csv')} disabled={generating || getPreviewData().length === 0}>
-              {generating ? '...' : '↓ Excel (CSV)'}
+            <button className={styles.btnCSV} onClick={() => void handleExport('xlsx')} disabled={generating || previewCount() === 0}>
+              {generating ? '...' : '↓ Excel (.xlsx)'}
             </button>
-            <button className={styles.btnWord} onClick={() => handleExport('word')} disabled={generating || getPreviewData().length === 0}>
-              {generating ? '...' : '↓ Word'}
+            <button className={styles.btnWord} onClick={() => void handleExport('word')} disabled={generating || previewCount() === 0}>
+              {generating ? '...' : '↓ Word (.docx)'}
             </button>
           </div>
         </div>
@@ -332,18 +592,23 @@ export default function ReportsPage() {
         <div className={styles.tableWrap}>
           {activeReport === 'courses' && (
             <table className={styles.table}>
-              <thead><tr><th>№</th><th>Название</th><th>Статус</th><th>Начало</th><th>Окончание</th><th>Теги</th></tr></thead>
+              <thead><tr><th>№</th><th>Название</th><th>Статус</th><th>Групп</th><th>Слушателей</th><th>Начало</th><th>Окончание</th><th>Теги</th></tr></thead>
               <tbody>
-                {getCoursesReport().map((c, i) => (
+                {getCoursesReport().map((c, i) => {
+                  const m = courseMetrics(c.pkIdCourse);
+                  return (
                   <tr key={c.pkIdCourse}>
                     <td>{i + 1}</td>
                     <td className={styles.bold}>{c.title}</td>
                     <td><span className={`${styles.badge} ${c.statusName === 'Опубликован' ? styles.green : c.statusName === 'Черновик' ? styles.yellow : styles.gray}`}>{c.statusName}</span></td>
-                    <td>{c.startDate ? new Date(c.startDate).toLocaleDateString('ru-RU') : '—'}</td>
-                    <td>{c.endDate ? new Date(c.endDate).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td>{m.groupCount}</td>
+                    <td>{m.listeners}</td>
+                    <td>{formatDate(c.startDate)}</td>
+                    <td>{formatDate(c.endDate)}</td>
                     <td className={styles.muted}>{c.tags || '—'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -358,7 +623,7 @@ export default function ReportsPage() {
                     <td className={styles.bold}>{c.listenerName}</td>
                     <td>{c.courseTitle}</td>
                     <td>{c.templateName}</td>
-                    <td>{c.issuedAt ? new Date(c.issuedAt).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td>{formatDate(c.issuedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -374,7 +639,7 @@ export default function ReportsPage() {
                     <td>{i + 1}</td>
                     <td className={styles.bold}>{ct.teacherName}</td>
                     <td>{ct.courseTitle}</td>
-                    <td>{ct.assignedAt ? new Date(ct.assignedAt).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td>{formatDate(ct.assignedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -390,8 +655,8 @@ export default function ReportsPage() {
                     <td>{i + 1}</td>
                     <td className={styles.bold}>{c.title}</td>
                     <td><span className={`${styles.badge} ${c.statusName === 'Опубликован' ? styles.green : c.statusName === 'Черновик' ? styles.yellow : styles.gray}`}>{c.statusName}</span></td>
-                    <td>{c.startDate ? new Date(c.startDate).toLocaleDateString('ru-RU') : '—'}</td>
-                    <td>{c.endDate ? new Date(c.endDate).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td>{formatDate(c.startDate)}</td>
+                    <td>{formatDate(c.endDate)}</td>
                     <td>{c.startDate && c.endDate ? Math.ceil((new Date(c.endDate).getTime() - new Date(c.startDate).getTime()) / 86400000) : '—'}</td>
                   </tr>
                 ))}
@@ -399,7 +664,55 @@ export default function ReportsPage() {
             </table>
           )}
 
-          {getPreviewData().length === 0 && (
+          {activeReport === 'enrollments' && (
+            <table className={styles.table}>
+              <thead><tr><th>№</th><th>Курс</th><th>Группа</th><th>Слушатель</th><th>E-mail</th></tr></thead>
+              <tbody>
+                {getEnrollmentsReport().map((r, i) => (
+                  <tr key={r.pkIdGroupListener}>
+                    <td>{i + 1}</td>
+                    <td className={styles.bold}>{r.courseTitle}</td>
+                    <td>{r.groupName}</td>
+                    <td>{r.listenerName}</td>
+                    <td className={styles.muted}>{r.email}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeReport === 'attempts' && (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Курс</th>
+                  <th>Всего</th>
+                  <th>На проверке</th>
+                  <th>Принято</th>
+                  <th>Отклонено</th>
+                  <th>Доработка</th>
+                  <th>Ср. балл</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getAttemptsCourseSummary().map((r, i) => (
+                  <tr key={r.courseId}>
+                    <td>{i + 1}</td>
+                    <td className={styles.bold}>{r.title}</td>
+                    <td>{r.total}</td>
+                    <td>{r.pending}</td>
+                    <td>{r.accepted}</td>
+                    <td>{r.rejected}</td>
+                    <td>{r.rework}</td>
+                    <td>{r.avgAccepted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {previewCount() === 0 && (
             <div className={styles.empty}>Нет данных для отображения</div>
           )}
         </div>

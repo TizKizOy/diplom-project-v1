@@ -1,0 +1,62 @@
+$muted: #64748b;
+$border: #e2e8f0;
+$accent: #0066cc;
+
+.wrap {
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.8rem;
+}
+
+.lead {
+  font-size: 1.5rem;
+  color: $muted;
+  margin: 0 0 3.2rem;
+  line-height: 1.5;
+}
+
+.section {
+  margin-bottom: 3.2rem;
+  padding: 2.4rem;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.sectionTitle {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1.6rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 2px solid $accent;
+}
+
+.list {
+  margin: 0;
+  padding-left: 2rem;
+  font-size: 1.4rem;
+  line-height: 1.65;
+  color: #334155;
+
+  li {
+    margin-bottom: 0.8rem;
+  }
+}
+
+.note {
+  margin-top: 1.6rem;
+  padding: 1.2rem 1.6rem;
+  background: #f8fafc;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  color: $muted;
+  line-height: 1.5;
+}

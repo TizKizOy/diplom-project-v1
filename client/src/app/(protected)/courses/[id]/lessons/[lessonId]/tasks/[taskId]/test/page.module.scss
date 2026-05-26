@@ -240,7 +240,24 @@ $red: #dc2626;
   h1 { font-size: 2.4rem; font-weight: 700; color: #0f172a; }
 }
 
-.resultIcon { font-size: 5.6rem; }
+.resultIcon {
+  width: 0.6rem;
+  min-height: 4.8rem;
+  border-radius: 0.4rem;
+  background: #64748b;
+}
+
+.resultOk {
+  background: #16a34a;
+}
+
+.resultFail {
+  background: #dc2626;
+}
+
+.resultWait {
+  background: #ca8a04;
+}
 
 .resultStatus { font-size: 1.6rem; color: $text-muted; }
 

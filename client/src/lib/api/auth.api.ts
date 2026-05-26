@@ -25,7 +25,7 @@ export const authApi = {
   },
 
   refresh: async () => {
-    const response = await apiClient.post('auth/refresh');
+    const response = await apiClient.post('/auth/refresh');
     return response.data;
   },
 

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { messagesApi, type IMessage } from '@/lib/api/messages.api';
 import { usersApi } from '@/lib/api/users.api';
 import type { IUser } from '@/lib/types';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import styles from './page.module.scss';
 
 interface IDialog {
@@ -17,7 +18,6 @@ interface IDialog {
 
 export default function MessagesPage() {
   const { user } = useAuth();
-  const initialized = useRef(false);
 
   const [dialogs, setDialogs] = useState<IDialog[]>([]);
   const [activeDialog, setActiveDialog] = useState<IDialog | null>(null);
@@ -28,48 +28,79 @@ export default function MessagesPage() {
   const [newText, setNewText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('ru-RU');
+  };
+  const formatTime = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? '—'
+      : parsed.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  };
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!user) return;
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
     try {
-      const [sent, received, users] = await Promise.all([
+      const [sent, received, contacts] = await Promise.all([
         messagesApi.getBySender(user.pkIdUser),
         messagesApi.getByReceiver(user.pkIdUser),
-        usersApi.getAll(),
+        usersApi.getMessagingContacts(),
       ]);
-      setAllUsers(users.filter((u) => u.pkIdUser !== user.pkIdUser));
-      buildDialogs(sent, received, user.pkIdUser);
-    } catch {
-      // ignore
+      setAllUsers(contacts.filter((u) => u.pkIdUser !== user.pkIdUser));
+      buildDialogs(sent, received, user.pkIdUser, contacts);
+    } catch (err) {
+      setDialogs([]);
+      setLoadError(getApiErrorMessage(err, 'Не удалось загрузить сообщения'));
     } finally {
       setLoading(false);
     }
   };
 
-  const buildDialogs = (sent: IMessage[], received: IMessage[], myId: number) => {
+  const buildDialogs = (
+    sent: IMessage[],
+    received: IMessage[],
+    myId: number,
+    contacts: IUser[],
+  ) => {
     const dialogMap = new Map<number, IMessage[]>();
     sent.forEach((m) => {
       const otherId = m.fkIdReceiver;
+      if (otherId == null || Number.isNaN(Number(otherId))) return;
       if (!dialogMap.has(otherId)) dialogMap.set(otherId, []);
       dialogMap.get(otherId)!.push(m);
     });
     received.forEach((m) => {
       const otherId = m.fkIdSender;
+      if (otherId == null || Number.isNaN(Number(otherId))) return;
       if (!dialogMap.has(otherId)) dialogMap.set(otherId, []);
       dialogMap.get(otherId)!.push(m);
     });
     const result: IDialog[] = [];
     dialogMap.forEach((msgs, userId) => {
-      const sorted = msgs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      const sorted = msgs.sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
       const last = sorted[sorted.length - 1];
       const unread = msgs.filter((m) => m.fkIdSender === userId && !m.isRead).length;
-      const userName = last.fkIdSender === userId ? last.senderName : last.receiverName;
+      const contact = contacts.find((c) => c.pkIdUser === userId);
+      const userName =
+        contact?.fullName ||
+        (last.fkIdSender === userId ? last.senderName : last.receiverName) ||
+        `Пользователь #${userId}`;
       result.push({ userId, userName, messages: sorted, lastMessage: last, unreadCount: unread });
     });
     result.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
@@ -104,8 +135,8 @@ export default function MessagesPage() {
       setShowNewMsg(false);
       setNewReceiverId('');
       await loadData();
-    } catch (err: any) {
-      setSendError(err.response?.data?.message || 'Ошибка отправки');
+    } catch (err) {
+      setSendError(getApiErrorMessage(err, 'Ошибка отправки'));
     } finally {
       setSending(false);
     }
@@ -121,6 +152,7 @@ export default function MessagesPage() {
           + Новое сообщение
         </button>
       </div>
+      {loadError && <p className={styles.errorText}>{loadError}</p>}
 
       <div className={styles.layout}>
         {/* Dialogs list */}
@@ -136,7 +168,7 @@ export default function MessagesPage() {
               <div className={styles.dialogInfo}>
                 <div className={styles.dialogTop}>
                   <strong>{d.userName}</strong>
-                  <span className={styles.dialogTime}>{new Date(d.lastMessage.createdAt).toLocaleDateString('ru-RU')}</span>
+                  <span className={styles.dialogTime}>{formatDate(d.lastMessage.createdAt)}</span>
                 </div>
                 <div className={styles.dialogBottom}>
                   <span className={styles.dialogPreview}>{d.lastMessage.message}</span>
@@ -169,7 +201,7 @@ export default function MessagesPage() {
                     <div key={m.pkIdMessage} className={`${styles.message} ${isMine ? styles.mine : styles.theirs}`}>
                       <div className={styles.msgBubble}>{m.message}</div>
                       <span className={styles.msgTime}>
-                        {new Date(m.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(m.createdAt)}
                       </span>
                     </div>
                   );

@@ -23,7 +23,14 @@ export const commentsApi = {
     userId: number;
     message: string;
   }): Promise<IComment> =>
-    (await apiClient.post('/comments', dto)).data,
+    (
+      await apiClient.post('/comments', {
+        fkIdTask: dto.taskId,
+        fkIdAttempt: dto.attemptId,
+        fkIdUser: dto.userId,
+        message: dto.message,
+      })
+    ).data,
 
   delete: async (id: number) =>
     (await apiClient.delete(`/comments/${id}`)).data,

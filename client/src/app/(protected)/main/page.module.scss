@@ -217,16 +217,42 @@ $dark: #0f172a;
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 0.3rem;
-    background: $blue;
+    background: #0066cc;
   }
 
   &:hover {
-    border-color: $blue;
-    box-shadow: 0 0.4rem 1.2rem rgba(26,86,219,0.1);
+    border-color: #0066cc;
+    box-shadow: 0 0.4rem 1.6rem rgba(0, 102, 204, 0.12);
   }
 
   h3 { font-size: 1.5rem; font-weight: 600; color: $dark; line-height: 1.4; }
   p  { font-size: 1.3rem; color: $muted; line-height: 1.5; }
+}
+
+.progressRing {
+  position: absolute;
+  top: 1.6rem;
+  right: 1.6rem;
+  width: 5.6rem;
+  height: 5.6rem;
+  border-radius: 50%;
+  background: conic-gradient(#0066cc calc(var(--pct, 0) * 1%), #e8ecf0 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progressRingValue {
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0066cc;
 }
 
 .enrollmentTop { display: flex; align-items: center; gap: 0.8rem; }
@@ -267,6 +293,14 @@ $dark: #0f172a;
   border: 1px solid $border;
   border-radius: 0.8rem;
   padding: 1.2rem 1.6rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    border-color: $blue;
+    box-shadow: 0 1px 6px rgba(26, 86, 219, 0.12);
+  }
 }
 
 .attemptInfo {

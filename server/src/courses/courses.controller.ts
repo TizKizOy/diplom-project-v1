@@ -37,6 +37,13 @@ export class CoursesController {
     return await this.coursesService.getAll();
   }
 
+  @Get('meta/tags')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({ summary: 'Справочник тегов для привязки к курсам' })
+  async getTagsCatalog() {
+    return await this.coursesService.getTagsCatalog();
+  }
+
   @Get('deleted/list')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Получить удалённые курсы' })

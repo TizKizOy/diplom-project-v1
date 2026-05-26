@@ -1655,7 +1655,7 @@ go
 			@pkIdGroupListener INT = NULL, @fkIdGroup INT = NULL, @fkIdListener INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
 			SET NOCOUNT ON;
-			SELECT gl.pkIdGroupListener, g.name AS groupName, c.title AS courseTitle, u.fullName as listenerName, u.email, u.phone
+			SELECT gl.pkIdGroupListener, gl.fkIdGroup, gl.fkIdListener, g.fkIdCourse, g.name AS groupName, c.title AS courseTitle, u.fullName as listenerName, u.email, u.phone
 			FROM tbGroupListener gl
 			JOIN tbGroup g ON gl.fkIdGroup = g.pkIdGroup
 			JOIN tbUsers u ON gl.fkIdListener = u.pkIdUser
@@ -1964,7 +1964,8 @@ go
 			@pkIdTask INT = NULL, @fkIdTypeTasks INT = NULL, @fkIdCourse INT = NULL, @fkIdLesson INT = NULL, @taskTitle NVARCHAR(255) = NULL, @isDeleted BIT = 0
 		AS BEGIN
 			SET NOCOUNT ON;
-			SELECT t.pkIdTask, t.title AS taskTitle, t.description, t.deadline, t.maxScore,
+			SELECT t.pkIdTask, t.fkIdCourse, t.fkIdLesson, t.fkIdTypeTasks AS typeId, t.fkIdTest, t.sortOrder,
+				t.title AS taskTitle, t.description, t.deadline, t.maxScore,
 				tt.name AS taskTypeName, l.title AS lessonTitle, c.title AS courseTitle
 			FROM tbTasks t
 			LEFT JOIN tbTypeTasks tt ON t.fkIdTypeTasks = tt.pkIdTypeTask
@@ -2443,11 +2444,11 @@ go
 
 	--#region ===== ATTEMPT =====
 		CREATE OR ALTER PROCEDURE prGetAttemptsWithUsersAndStatus
-			@pkIdAttempt INT = NULL, @fkIdTask INT = NULL, @fkIdListener INT = NULL, @fkIdStatusAttempt INT = NULL, @isDeleted BIT = 0
+			@pkIdAttempt INT = NULL, @fkIdTask INT = NULL, @fkIdListener INT = NULL, @fkIdStatusAttempt INT = NULL, @isDeleted BIT = 0, @fkIdCourse INT = NULL
 		AS BEGIN
 			SET NOCOUNT ON;
-			SELECT a.pkIdAttempt, t.title AS taskTitle, u.fullName AS listenerName,
-				 sa.name AS statusName, a.submittedAt, a.score
+			SELECT a.pkIdAttempt, a.fkIdTask, a.fkIdListener, t.fkIdLesson, t.fkIdCourse, t.title AS taskTitle, u.fullName AS listenerName,
+				 sa.name AS statusName, a.submittedAt, a.score, a.answerText, a.answerFileUrl
 			FROM tbAttempt a
 			LEFT JOIN tbTasks t ON a.fkIdTask = t.pkIdTask
 			LEFT JOIN tbUsers u ON a.fkIdListener = u.pkIdUser
@@ -2457,6 +2458,7 @@ go
 				AND (@fkIdTask IS NULL OR a.fkIdTask = @fkIdTask)
 				AND (@fkIdListener IS NULL OR a.fkIdListener = @fkIdListener)
 				AND (@fkIdStatusAttempt IS NULL OR a.fkIdStatusAttempt = @fkIdStatusAttempt)
+				AND (@fkIdCourse IS NULL OR t.fkIdCourse = @fkIdCourse)
 		END
 		GO
 
@@ -2531,15 +2533,6 @@ go
 					IF @score < 0 OR @score > 100
 					BEGIN
 						RAISERROR('Оценка должна быть в диапазоне 0-100', 16, 1);
-						ROLLBACK TRANSACTION;
-						RETURN;
-					END
-            
-					IF @fkIdStatusAttempt IS NULL
-						SET @fkIdStatusAttempt = 4;
-					ELSE IF @fkIdStatusAttempt NOT IN (3, 4) 
-					BEGIN
-						RAISERROR('При выставлении оценки статус должен быть "Отклонено" или "На доработке"', 16, 1);
 						ROLLBACK TRANSACTION;
 						RETURN;
 					END

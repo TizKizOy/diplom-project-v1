@@ -46,7 +46,7 @@ export class TestQuestionsController {
   }
 
   @Get('test/:testId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить вопросы по ID теста' })
   async getByTest(
     @Param('testId', ParseIntPipe) testId: number,

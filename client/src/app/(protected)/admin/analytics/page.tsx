@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { coursesApi } from '@/lib/api/courses.api';
 import { usersApi } from '@/lib/api/users.api';
@@ -9,18 +9,27 @@ import { attemptsApi } from '@/lib/api/attempts.api';
 import { certificatesApi } from '@/lib/api/certificates.api';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
 import type { ICourse, IUser, IGroup } from '@/lib/types';
-import { COURSE_STATUS, ATTEMPT_STATUS, ROLES } from '@/lib/constants';
+import type { IAttempt } from '@/lib/api/attempts.api';
+import { COURSE_STATUS, ROLES } from '@/lib/constants';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 import styles from './page.module.scss';
 
 export default function AnalyticsPage() {
   const { user, checkRole } = useAuth();
-  const initialized = useRef(false);
   const [loading, setLoading] = useState(true);
 
   const [courses, setCourses] = useState<ICourse[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
   const [groups, setGroups] = useState<IGroup[]>([]);
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<IAttempt[]>([]);
   const [certificates, setCertificates] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<number | ''>('');
 
@@ -28,12 +37,15 @@ export default function AnalyticsPage() {
   const isTeacher = checkRole([ROLES.TEACHER]);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [user, isAdmin, isTeacher]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       if (isAdmin) {
         const [c, u, g, a, cert] = await Promise.allSettled([
@@ -49,19 +61,51 @@ export default function AnalyticsPage() {
         if (a.status === 'fulfilled') setAttempts(a.value);
         if (cert.status === 'fulfilled') setCertificates(cert.value);
       } else if (isTeacher && user) {
-        // Преподаватель видит только свои курсы
         const assignments = await courseTeachersApi.getByTeacher(user.pkIdUser);
-        const courseIds = new Set(assignments.map((a: any) => a.fkIdCourse));
+        const courseIds = new Set(
+          assignments.map((a) => Number(a.fkIdCourse)).filter(Number.isFinite),
+        );
         const allCourses = await coursesApi.getAll();
+        const allGroups = await groupsApi.getAll();
+        const uid = Number(user.pkIdUser);
+        for (const gr of allGroups) {
+          const cur = gr.fkIdCurator != null ? Number(gr.fkIdCurator) : NaN;
+          if (Number.isFinite(cur) && cur === uid && gr.fkIdCourse) {
+            courseIds.add(Number(gr.fkIdCourse));
+          }
+        }
         const myCourses = allCourses.filter((c) => courseIds.has(c.pkIdCourse));
         setCourses(myCourses);
 
-        const [g, a] = await Promise.allSettled([
+        const ids = [...courseIds];
+        const [g, attemptLists, certLists] = await Promise.all([
           groupsApi.getAll(),
-          attemptsApi.getAll(),
+          Promise.all(ids.map((id) => attemptsApi.getByCourse(id))),
+          Promise.all(ids.map((id) => certificatesApi.getByCourse(id))),
         ]);
-        if (g.status === 'fulfilled') setGroups(g.value.filter((gr) => courseIds.has(gr.fkIdCourse)));
-        if (a.status === 'fulfilled') setAttempts(a.value);
+        setGroups(g.filter((gr) => courseIds.has(gr.fkIdCourse)));
+
+        const mergedAttempts: IAttempt[] = [];
+        const seenAtt = new Set<number>();
+        for (const list of attemptLists) {
+          for (const att of list) {
+            if (seenAtt.has(att.pkIdAttempt)) continue;
+            seenAtt.add(att.pkIdAttempt);
+            mergedAttempts.push(att);
+          }
+        }
+        setAttempts(mergedAttempts);
+
+        const mergedCerts: any[] = [];
+        const seenCert = new Set<number>();
+        for (const list of certLists) {
+          for (const cert of list) {
+            if (seenCert.has(cert.pkIdCertificate)) continue;
+            seenCert.add(cert.pkIdCertificate);
+            mergedCerts.push(cert);
+          }
+        }
+        setCertificates(mergedCerts);
       }
     } finally {
       setLoading(false);
@@ -79,9 +123,37 @@ export default function AnalyticsPage() {
   const published = filteredCourses.filter((c) => c.fkIdStatus === COURSE_STATUS.PUBLISHED);
   const drafts = filteredCourses.filter((c) => c.fkIdStatus === COURSE_STATUS.DRAFT);
 
-  const accepted = attempts.filter((a) => a.statusName === 'Принято');
-  const pending = attempts.filter((a) => a.statusName === 'На проверке');
-  const passRate = attempts.length > 0 ? Math.round((accepted.length / attempts.length) * 100) : 0;
+  const filteredAttempts = selectedCourse
+    ? attempts.filter((a) => a.fkIdCourse === Number(selectedCourse))
+    : attempts;
+
+  const accepted = filteredAttempts.filter((a) => a.statusName === 'Принято');
+  const pending = filteredAttempts.filter((a) => a.statusName === 'На проверке');
+  const passRate =
+    filteredAttempts.length > 0
+      ? Math.round((accepted.length / filteredAttempts.length) * 100)
+      : 0;
+
+  const avgAcceptedScore =
+    accepted.length > 0
+      ? Math.round(
+          accepted.reduce((sum, a) => sum + (Number(a.score) || 0), 0) /
+            accepted.length,
+        )
+      : null;
+
+  const attemptChartData = [
+    { name: 'На проверке', count: pending.length },
+    { name: 'Принято', count: accepted.length },
+    {
+      name: 'Отклонено',
+      count: filteredAttempts.filter((a) => a.statusName === 'Отклонено').length,
+    },
+    {
+      name: 'На доработке',
+      count: filteredAttempts.filter((a) => a.statusName === 'На доработке').length,
+    },
+  ];
 
   // Course stats
   const courseStats = filteredCourses.map((c) => {
@@ -94,7 +166,14 @@ export default function AnalyticsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1>Аналитика</h1>
+        <div>
+          <h1>Аналитика</h1>
+          <p className={styles.pageLead}>
+            {isAdmin
+              ? 'Сводка по платформе: курсы, слушатели, попытки и сертификаты.'
+              : 'Показатели по курсам, где вы преподаватель или куратор группы: проверка работ и завершение обучения.'}
+          </p>
+        </div>
         {courses.length > 1 && (
           <select
             value={selectedCourse}
@@ -137,17 +216,50 @@ export default function AnalyticsPage() {
           <div className={styles.statLabel}>На проверке</div>
           <div className={styles.statSub}>работ ждут</div>
         </div>
-        <div className={`${styles.statCard} ${styles.green}`}>
+        <div className={`${styles.statCard} ${styles.teal}`}>
           <div className={styles.statValue}>{accepted.length}</div>
           <div className={styles.statLabel}>Принято работ</div>
-          <div className={styles.statSub}>{passRate}% успеваемость</div>
+          <div className={styles.statSub}>
+            {passRate}% от всех попыток в выборке · средний балл по принятым:{' '}
+            {avgAcceptedScore != null ? `${avgAcceptedScore}` : '—'}
+          </div>
         </div>
         {isAdmin && (
           <div className={`${styles.statCard} ${styles.blue}`}>
             <div className={styles.statValue}>{certificates.length}</div>
             <div className={styles.statLabel}>Сертификатов</div>
+            <div className={styles.statSub}>по всей системе</div>
           </div>
         )}
+        {isTeacher && !isAdmin && (
+          <div className={`${styles.statCard} ${styles.blue}`}>
+            <div className={styles.statValue}>{certificates.length}</div>
+            <div className={styles.statLabel}>Сертификатов</div>
+            <div className={styles.statSub}>выдано по вашим курсам</div>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.section}>
+        <h2>Распределение статусов попыток</h2>
+        <div className={styles.chartWrap}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={attemptChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf1" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                angle={-14}
+                textAnchor="end"
+                height={58}
+              />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(v) => [`${v ?? 0}`, 'Количество']} />
+              <Bar dataKey="count" fill="#1a56db" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Course breakdown */}
@@ -161,13 +273,13 @@ export default function AnalyticsPage() {
                 <th>Статус</th>
                 <th>Групп</th>
                 <th>Слушателей</th>
-                {isAdmin && <th>Сертификатов</th>}
+                {(isAdmin || isTeacher) && <th>Сертификатов</th>}
                 <th>Период</th>
               </tr>
             </thead>
             <tbody>
               {courseStats.length === 0 ? (
-                <tr><td colSpan={6} className={styles.empty}>Нет данных</td></tr>
+                <tr><td colSpan={isAdmin || isTeacher ? 6 : 5} className={styles.empty}>Нет данных</td></tr>
               ) : courseStats.map((c) => (
                 <tr key={c.pkIdCourse}>
                   <td className={styles.bold}>{c.title}</td>
@@ -179,7 +291,7 @@ export default function AnalyticsPage() {
                   </td>
                   <td>{c.groups}</td>
                   <td>{c.listeners}</td>
-                  {isAdmin && <td>{c.certs}</td>}
+                  {(isAdmin || isTeacher) && <td>{c.certs}</td>}
                   <td className={styles.muted}>
                     {c.startDate && new Date(c.startDate).toLocaleDateString('ru-RU')} —{' '}
                     {c.endDate && new Date(c.endDate).toLocaleDateString('ru-RU')}
@@ -198,8 +310,8 @@ export default function AnalyticsPage() {
           {[
             { label: 'На проверке', count: pending.length, color: styles.yellow },
             { label: 'Принято', count: accepted.length, color: styles.green },
-            { label: 'Отклонено', count: attempts.filter((a) => a.statusName === 'Отклонено').length, color: styles.red },
-            { label: 'На доработке', count: attempts.filter((a) => a.statusName === 'На доработке').length, color: styles.orange },
+            { label: 'Отклонено', count: filteredAttempts.filter((a) => a.statusName === 'Отклонено').length, color: styles.red },
+            { label: 'На доработке', count: filteredAttempts.filter((a) => a.statusName === 'На доработке').length, color: styles.orange },
           ].map((s) => (
             <div key={s.label} className={`${styles.attemptCard} ${s.color}`}>
               <div className={styles.attemptValue}>{s.count}</div>

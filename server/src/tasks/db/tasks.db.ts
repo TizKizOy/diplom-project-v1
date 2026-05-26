@@ -56,7 +56,7 @@ export const createTask = async (
     {
       fkIdTypeTasks: dto.typeId,
       fkIdCourse: dto.courseId,
-      fkIdLesson: dto.lessonId,
+      fkIdLesson: dto.lessonId ?? null,
       fkIdTest: dto.testId ?? null,
       title: dto.title,
       description: dto.description,

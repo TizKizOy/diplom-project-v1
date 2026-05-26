@@ -10,6 +10,7 @@ export const getAttempts = async (filter: {
   taskId?: number;
   listenerId?: number;
   statusId?: number;
+  courseId?: number;
   isDeleted?: boolean;
 }): Promise<IAttempt[]> => {
   return await query<IAttempt>(
@@ -18,13 +19,15 @@ export const getAttempts = async (filter: {
     @fkIdTask = @fkIdTask,
     @fkIdListener = @fkIdListener,
     @fkIdStatusAttempt = @fkIdStatusAttempt,
-    @isDeleted = @isDeleted`,
+    @isDeleted = @isDeleted,
+    @fkIdCourse = @fkIdCourse`,
     {
       pkIdAttempt: filter.id ?? null,
       fkIdTask: filter.taskId ?? null,
       fkIdListener: filter.listenerId ?? null,
       fkIdStatusAttempt: filter.statusId ?? null,
       isDeleted: filter.isDeleted ?? 0,
+      fkIdCourse: filter.courseId ?? null,
     },
   );
 };
@@ -70,10 +73,10 @@ export const updateAttempt = async (
     @score = @score`,
     {
       pkIdAttempt: id,
-      fkIdStatusAttempt: dto.statusId,
-      answerText: dto.answerText,
-      answerFileUrl: dto.answerFileUrl,
-      score: dto.score
+      fkIdStatusAttempt: dto.statusId ?? null,
+      answerText: dto.answerText ?? null,
+      answerFileUrl: dto.answerFileUrl ?? null,
+      score: dto.score ?? null,
     },
     adminId,
   );

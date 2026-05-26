@@ -6,9 +6,13 @@ import {
   MaxLength,
   IsUrl,
   IsBoolean,
+  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const emptyToUndefined = ({ value }: { value: unknown }) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
 
 export class CreateMaterialDto {
   @ApiProperty({
@@ -24,6 +28,7 @@ export class CreateMaterialDto {
     example: 4,
   })
   @IsInt({ message: 'ID урока должно быть числом' })
+  @Min(1, { message: 'Выберите урок' })
   @Type(() => Number)
   lessonId: number;
 
@@ -47,21 +52,22 @@ export class CreateMaterialDto {
   @MaxLength(255, { message: 'Название максимум 255 символов' })
   title: string;
 
-  @ApiProperty({
-    description: 'Описание материала',
+  @ApiPropertyOptional({
+    description: 'Описание материала (если пусто — подставится на сервере)',
     example: 'В первой лекции будет информация о введение в курс React',
-    minLength: 3,
     maxLength: 2000,
   })
+  @Transform(emptyToUndefined)
+  @IsOptional()
   @IsString({ message: 'Описание должно быть строкой' })
-  @MinLength(3, { message: 'Описание минимум 3 символа' })
   @MaxLength(2000, { message: 'Описание максимум 2000 символов' })
-  description: string;
+  description?: string;
 
   @ApiPropertyOptional({
     description: 'URL файла материала',
     example: 'https://example.com/materials/file.pdf',
   })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsString({ message: 'URL файла должен быть строкой' })
   @IsUrl({}, { message: 'Некорректный URL файла' })
@@ -71,6 +77,7 @@ export class CreateMaterialDto {
     description: 'Ссылка на внешний ресурс',
     example: 'https://example.com/materials/page',
   })
+  @Transform(emptyToUndefined)
   @IsOptional()
   @IsString({ message: 'Ссылка должна быть строкой' })
   @IsUrl({}, { message: 'Некорректная ссылка' })

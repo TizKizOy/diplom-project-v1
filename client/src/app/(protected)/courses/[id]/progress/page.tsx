@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { coursesApi } from '@/lib/api/courses.api';
@@ -20,7 +20,6 @@ export default function CourseProgressPage() {
   const router = useRouter();
   const { user } = useAuth();
   const courseId = Number(params.id);
-  const initialized = useRef(false);
 
   const [course, setCourse] = useState<ICourse | null>(null);
   const [lessons, setLessons] = useState<ILesson[]>([]);
@@ -29,15 +28,22 @@ export default function CourseProgressPage() {
   const [certificate, setCertificate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('ru-RU');
+  };
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!user) return;
     loadData();
-  }, []);
+  }, [courseId, user]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const [courseData, lessonsData, tasksData, attemptsData] = await Promise.all([
         coursesApi.getById(courseId),
@@ -120,18 +126,18 @@ export default function CourseProgressPage() {
       <div className={styles.courseCard}>
         <h2>{course.title}</h2>
         <div className={styles.courseMeta}>
-          <span>📅 {course.startDate && new Date(course.startDate).toLocaleDateString('ru-RU')} — {course.endDate && new Date(course.endDate).toLocaleDateString('ru-RU')}</span>
-          {!isEnrolled && <span className={styles.notEnrolled}>⚠️ Вы не записаны на этот курс</span>}
+          <span>{formatDate(course.startDate)} — {formatDate(course.endDate)}</span>
+          {!isEnrolled && <span className={styles.notEnrolled}>Вы не записаны на этот курс</span>}
         </div>
       </div>
 
       {/* Certificate */}
       {certificate && (
         <div className={styles.certCard}>
-          <span className={styles.certIcon}>🎓</span>
+          <span className={styles.certIcon} aria-hidden />
           <div>
             <h3>Сертификат получен!</h3>
-            <p>Выдан {new Date(certificate.issuedAt).toLocaleDateString('ru-RU')}</p>
+            <p>Выдан {formatDate(certificate.issuedAt)}</p>
           </div>
           <Link href="/certificates" className={styles.btnCert}>Просмотреть →</Link>
         </div>
@@ -242,7 +248,7 @@ export default function CourseProgressPage() {
                         : <span className={styles.muted}>—/{t.maxScore}</span>}
                     </td>
                     <td className={styles.muted}>
-                      {attempt ? new Date(attempt.submittedAt).toLocaleDateString('ru-RU') : '—'}
+                      {attempt ? formatDate(attempt.submittedAt) : '—'}
                     </td>
                     <td>
                       <Link

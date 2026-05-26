@@ -3,7 +3,7 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useRef } from 'react';
-import type { ICourse, ILesson, ITask, IMaterial } from '@/lib/types';
+import { getMaterialTitle, type ICourse, type ILesson, type ITask, type IMaterial } from '@/lib/types';
 import type { ICourseTeacher } from '@/lib/api/courseTeachers.api';
 
 interface Props {
@@ -24,6 +24,11 @@ export function CourseReportGenerator({
   className,
 }: Props) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const safeDate = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('ru-RU');
+  };
 
   const downloadPDF = async () => {
     if (!reportRef.current) return;
@@ -167,7 +172,7 @@ export function CourseReportGenerator({
                 <td
                   style={{ padding: '8px 0', borderBottom: '1px solid #ccc' }}
                 >
-                  {new Date(course.startDate).toLocaleDateString('ru-RU')}
+                  {safeDate(course.startDate)}
                 </td>
               </tr>
               <tr>
@@ -179,7 +184,7 @@ export function CourseReportGenerator({
                 <td
                   style={{ padding: '8px 0', borderBottom: '1px solid #ccc' }}
                 >
-                  {new Date(course.endDate).toLocaleDateString('ru-RU')}
+                  {safeDate(course.endDate)}
                 </td>
               </tr>
               {course.tags && (
@@ -368,7 +373,7 @@ export function CourseReportGenerator({
                       {t.teacherName}
                     </td>
                     <td style={{ padding: '10px', border: '1px solid #000' }}>
-                      {new Date(t.assignedAt).toLocaleDateString('ru-RU')}
+                      {safeDate(t.assignedAt)}
                     </td>
                   </tr>
                 ))}
@@ -444,9 +449,7 @@ export function CourseReportGenerator({
                                 <span>
                                   {' '}
                                   (до{' '}
-                                  {new Date(task.deadline).toLocaleDateString(
-                                    'ru-RU',
-                                  )}
+                                  {safeDate(task.deadline)}
                                   )
                                 </span>
                               )}
@@ -473,7 +476,7 @@ export function CourseReportGenerator({
                               key={mat.pkIdMaterial}
                               style={{ marginBottom: '5px', fontSize: '13px' }}
                             >
-                              {mat.title} — {mat.typeName}
+                              {getMaterialTitle(mat)} — {mat.typeName}
                             </li>
                           ))}
                         </ul>
@@ -613,7 +616,7 @@ export function CourseReportGenerator({
                         <td
                           style={{ padding: '8px', border: '1px solid #000' }}
                         >
-                          {mat.title}
+                          {getMaterialTitle(mat)}
                         </td>
                         <td
                           style={{ padding: '8px', border: '1px solid #000' }}
@@ -697,8 +700,7 @@ export function CourseReportGenerator({
                   Период проведения
                 </td>
                 <td style={{ padding: '8px', border: '1px solid #000' }}>
-                  {new Date(course.startDate).toLocaleDateString('ru-RU')} —{' '}
-                  {new Date(course.endDate).toLocaleDateString('ru-RU')}
+                  {safeDate(course.startDate)} — {safeDate(course.endDate)}
                 </td>
               </tr>
               <tr>

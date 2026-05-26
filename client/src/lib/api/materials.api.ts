@@ -6,6 +6,7 @@ export interface ICreateMaterialDto {
   lessonId: number;
   typeMaterialId: number;
   title: string;
+  /** Если не передать — сервер подставит текст по умолчанию */
   description?: string;
   fileUrl?: string;
   link?: string;

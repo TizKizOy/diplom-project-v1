@@ -10,14 +10,12 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  Query,
-  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { MessageService } from './message.service';
 import { IDeletedResult } from '../common/interfaces/delete.interfaces';
@@ -30,6 +28,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
 
 @ApiTags('Messages')
 @ApiBearerAuth()
@@ -38,7 +37,7 @@ import { Role } from 'src/common/enums/role.enum';
 export class MessageController {
   constructor(private readonly messageService: MessageService) {}
 
-  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @Roles(Role.ADMIN)
   @Get()
   @ApiOperation({ summary: 'Получить все активные сообщения' })
   async getAll(): Promise<IMessage[]> {
@@ -50,8 +49,33 @@ export class MessageController {
   @ApiOperation({ summary: 'Получить сообщения по отправителю' })
   async getBySender(
     @Param('senderId', ParseIntPipe) senderId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IMessage[]> {
+    const canViewOtherUsers = user.roleName === Role.ADMIN;
+    if (!canViewOtherUsers && user.pkIdUser !== senderId) {
+      throw new ForbiddenException(
+        'Нет прав на просмотр сообщений другого отправителя',
+      );
+    }
+
     return await this.messageService.getBySender(senderId);
+  }
+
+  @Get('receiver/:receiverId/unread')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({ summary: 'Непрочитанные сообщения для получателя' })
+  async getUnreadByReceiver(
+    @Param('receiverId', ParseIntPipe) receiverId: number,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IMessage[]> {
+    const canViewOtherUsers = user.roleName === Role.ADMIN;
+    if (!canViewOtherUsers && user.pkIdUser !== receiverId) {
+      throw new ForbiddenException(
+        'Нет прав на просмотр сообщений другого получателя',
+      );
+    }
+
+    return await this.messageService.getUnreadByReceiver(receiverId);
   }
 
   @Get('receiver/:receiverId')
@@ -59,7 +83,15 @@ export class MessageController {
   @ApiOperation({ summary: 'Получить сообщения по получателю' })
   async getByReceiver(
     @Param('receiverId', ParseIntPipe) receiverId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IMessage[]> {
+    const canViewOtherUsers = user.roleName === Role.ADMIN;
+    if (!canViewOtherUsers && user.pkIdUser !== receiverId) {
+      throw new ForbiddenException(
+        'Нет прав на просмотр сообщений другого получателя',
+      );
+    }
+
     return await this.messageService.getByReceiver(receiverId);
   }
 
@@ -82,9 +114,18 @@ export class MessageController {
   @ApiOperation({ summary: 'Создать сообщение' })
   async create(
     @Body() body: CreateMessageDto,
-    @CurrentUser('pkIdUser') adminId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IMessage> {
-    return await this.messageService.create(body, adminId);
+    const canImpersonateSender = user.roleName === Role.ADMIN;
+    if (!canImpersonateSender && body.senderId !== user.pkIdUser) {
+      throw new ForbiddenException('Нельзя отправлять сообщения от имени другого пользователя');
+    }
+
+    const safeBody = {
+      ...body,
+      senderId: canImpersonateSender ? body.senderId : user.pkIdUser,
+    };
+    return await this.messageService.create(safeBody, user.pkIdUser);
   }
 
   @Put(':id')

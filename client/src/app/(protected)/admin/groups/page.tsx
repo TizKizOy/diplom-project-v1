@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { groupsApi, type ICreateGroupDto } from '@/lib/api/groups.api';
 import { groupListenersApi } from '@/lib/api/groupListeners.api';
@@ -9,11 +9,14 @@ import { usersApi } from '@/lib/api/users.api';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
 import type { IGroup, ICourse, IUser } from '@/lib/types';
 import { ROLES } from '@/lib/constants';
+import { useAppDialog } from '@/lib/hooks/useAppDialog';
+import { getGroupDisplayName } from '@/lib/groups/groupDisplayName';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import styles from './page.module.scss';
 
 export default function AdminGroupsPage() {
   const { user, checkRole } = useAuth();
-  const initialized = useRef(false);
+  const { alert, confirm } = useAppDialog();
 
   const [groups, setGroups] = useState<IGroup[]>([]);
   const [courses, setCourses] = useState<ICourse[]>([]);
@@ -36,10 +39,12 @@ export default function AdminGroupsPage() {
   const isTeacher = checkRole([ROLES.TEACHER]);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     loadAll();
-  }, []);
+  }, [user, isAdmin, isTeacher]);
 
   const loadAll = async () => {
     try {
@@ -74,7 +79,11 @@ export default function AdminGroupsPage() {
   const openGroupForm = (group?: IGroup) => {
     if (group) {
       setEditingGroup(group);
-      setGroupForm({ name: group.name, courseId: group.fkIdCourse, curatorId: group.fkIdCurator });
+      setGroupForm({
+        name: getGroupDisplayName(group),
+        courseId: group.fkIdCourse,
+        curatorId: group.fkIdCurator ?? undefined,
+      });
     } else {
       setEditingGroup(null);
       setGroupForm({ name: '', courseId: 0, curatorId: undefined });
@@ -102,12 +111,12 @@ export default function AdminGroupsPage() {
   };
 
   const deleteGroup = async (id: number) => {
-    if (!confirm('Удалить группу?')) return;
+    if (!(await confirm('Удалить группу?'))) return;
     try {
       await groupsApi.delete(id);
       await loadAll();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка');
+    } catch (err: unknown) {
+      await alert(getApiErrorMessage(err, 'Ошибка'));
     }
   };
 
@@ -142,7 +151,7 @@ export default function AdminGroupsPage() {
   };
 
   const removeListener = async (glId: number) => {
-    if (!confirm('Исключить слушателя?')) return;
+    if (!(await confirm('Исключить слушателя?'))) return;
     try {
       await groupListenersApi.delete(glId);
       if (selectedGroup) {
@@ -150,8 +159,8 @@ export default function AdminGroupsPage() {
         setGroupListeners(data);
         await loadAll();
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка');
+    } catch (err: unknown) {
+      await alert(getApiErrorMessage(err, 'Ошибка'));
     }
   };
 
@@ -199,8 +208,8 @@ export default function AdminGroupsPage() {
                 <td>
                   <div className={styles.actions}>
                     <button onClick={() => openListeners(g)} className={styles.btnOutline}>Слушатели</button>
-                    <button onClick={() => openGroupForm(g)} className={styles.btnIcon} title="Редактировать">✏️</button>
-                    <button onClick={() => deleteGroup(g.pkIdGroup)} className={styles.btnIconDanger} title="Удалить">🗑️</button>
+                    <button onClick={() => openGroupForm(g)} className={styles.btnIcon} title="Редактировать">Ред.</button>
+                    <button onClick={() => deleteGroup(g.pkIdGroup)} className={styles.btnIconDanger} title="Удалить">Уд.</button>
                   </div>
                 </td>
               </tr>

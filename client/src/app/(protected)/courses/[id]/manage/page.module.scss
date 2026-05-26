@@ -106,6 +106,26 @@
   textarea { resize: vertical; min-height: 8rem; }
 }
 
+.tagMulti {
+  min-height: 12rem;
+  font-family: inherit;
+}
+
+.hintMuted {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 1.2rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.fieldHint {
+  font-size: 1.2rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin: -0.6rem 0 0.4rem;
+}
+
 .datesRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -143,6 +163,25 @@
   font-weight: 500;
   cursor: pointer;
   &:hover { background: #fecaca; }
+}
+
+.btnDangerOutline {
+  padding: 0.6rem 1.2rem;
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 0.6rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  cursor: pointer;
+  &:hover { background: #fef2f2; }
+}
+
+.attemptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
 }
 
 .btnEdit {
@@ -192,6 +231,14 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+}
+
+.tabHint {
+  font-size: 1.35rem;
+  line-height: 1.55;
+  color: #64748b;
+  margin: -1rem 0 1.6rem;
+  max-width: 72rem;
 }
 
 .empty {
@@ -297,6 +344,7 @@
   &.на_проверке { background: #fef3c7; color: #92400e; }
   &.принято { background: #d1fae5; color: #065f46; }
   &.отклонено { background: #fee2e2; color: #991b1b; }
+  &.на_доработке { background: #ffedd5; color: #9a3412; }
 }
 
 // Modal
@@ -370,7 +418,24 @@
 
 .gradeActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.2rem;
+}
+
+.btnSecondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 0.8rem 1.4rem;
+  border-radius: 0.6rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #e2e8f0;
+  }
 }
 
 @media (max-width: 768px) {

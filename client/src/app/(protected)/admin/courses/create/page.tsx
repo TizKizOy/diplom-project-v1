@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { coursesApi, type ICreateCourseDto } from '@/lib/api/courses.api';
+import { datetimeLocalToIso } from '@/lib/datetime/datetimeLocalToIso';
+import { isCourseDateRangeValid, isCourseStartNotInPast } from '@/lib/datetime/datetimeGuards';
+import { COURSE_STATUS } from '@/lib/constants';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import { usersApi } from '@/lib/api/users.api';
 import { type IUser } from '@/lib/types/index';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
@@ -12,13 +16,17 @@ import styles from './page.module.scss';
 
 const STATUS_OPTIONS = [
   { value: 1, label: 'Черновик' },
-  { value: 2, label: 'Опубликован' },
   { value: 3, label: 'Архивирован' },
 ];
 
+function todayDatetimeLocalMin(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
+}
+
 export default function CreateCoursePage() {
   const router = useRouter();
-  // Добавили isLoading из контекста!
   const { checkRole, isLoading: isAuthLoading } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -37,7 +45,6 @@ export default function CreateCoursePage() {
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | ''>('');
   const [groupName, setGroupName] = useState('');
 
-  // ИСПРАВЛЕННЫЙ USEEFFECT
   useEffect(() => {
     // 1. Если авторизация еще грузится — ждем и ничего не делаем
     if (isAuthLoading) return;
@@ -60,13 +67,11 @@ export default function CreateCoursePage() {
       setIsTeachersLoading(true);
       setError('');
 
-      // ПОЛУЧАЕМ ВСЕХ И ФИЛЬТРУЕМ (надежный метод)
       const allUsers = await usersApi.getAll();
       const filteredTeachers = allUsers.filter(
         (u) => u.roleName === 'Преподаватель',
       );
 
-      console.log(`Найдено преподавателей: ${filteredTeachers.length}`);
       setTeachers(filteredTeachers);
 
       if (filteredTeachers.length === 0) {
@@ -97,22 +102,33 @@ export default function CreateCoursePage() {
     setLoading(true);
     setError('');
 
+    if (!isCourseDateRangeValid(formData.startDate, formData.endDate)) {
+      setError('Дата окончания курса не может быть раньше даты начала.');
+      setLoading(false);
+      return;
+    }
+    if (!isCourseStartNotInPast(formData.startDate)) {
+      setError('Дата начала курса не может быть в прошлом.');
+      setLoading(false);
+      return;
+    }
+    if (formData.statusId === COURSE_STATUS.PUBLISHED) {
+      setError('При создании курс можно сохранить только как черновик. Опубликуйте после добавления урока с заданием.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // 1. Создаем копию данных формы
-      const payload = { ...formData };
+      const startIso = datetimeLocalToIso(formData.startDate);
+      const endIso = datetimeLocalToIso(formData.endDate);
+      const payload: ICreateCourseDto = {
+        title: formData.title,
+        description: formData.description,
+        statusId: formData.statusId,
+        ...(startIso ? { startDate: startIso } : {}),
+        ...(endIso ? { endDate: endIso } : {}),
+      };
 
-      // 2. Преобразуем строки в объекты Date (если они не пустые)
-      // Это гарантирует, что бэкенд получит валидный формат даты
-      if (payload.startDate) {
-        payload.startDate = new Date(payload.startDate).toISOString();
-        // Или просто new Date(payload.startDate), если DTO принимает объект Date
-      }
-
-      if (payload.endDate) {
-        payload.endDate = new Date(payload.endDate).toISOString();
-      }
-
-      // 3. Отправляем уже подготовленные данные
       const course = await coursesApi.create(payload);
 
       await courseTeachersApi.create({
@@ -128,16 +144,15 @@ export default function CreateCoursePage() {
         });
       }
 
-      router.push(`/courses/${course.pkIdCourse}`);
-    } catch (err: any) {
+      router.push(`/courses/${course.pkIdCourse}/manage`);
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.response?.data?.message || 'Ошибка при создании курса');
+      setError(getApiErrorMessage(err, 'Ошибка при создании курса'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Пока идет проверка прав или загрузка учителей
   if (isAuthLoading || isTeachersLoading) {
     return (
       <div className={styles.loading}>
@@ -190,6 +205,7 @@ export default function CreateCoursePage() {
             <label>Дата начала</label>
             <input
               type="datetime-local"
+              min={todayDatetimeLocalMin()}
               value={formData.startDate}
               onChange={(e) =>
                 setFormData({ ...formData, startDate: e.target.value })
@@ -200,6 +216,7 @@ export default function CreateCoursePage() {
             <label>Дата окончания</label>
             <input
               type="datetime-local"
+              min={formData.startDate || todayDatetimeLocalMin()}
               value={formData.endDate}
               onChange={(e) =>
                 setFormData({ ...formData, endDate: e.target.value })
@@ -229,7 +246,7 @@ export default function CreateCoursePage() {
 
           {teachers.length === 0 ? (
             <div className={styles.warningText}>
-              ⚠️ В системе нет преподавателей. Сначала создайте пользователя с
+              В системе нет преподавателей. Сначала создайте пользователя с
               ролью "Преподаватель" в разделе <b>Админ → Пользователи</b>.
             </div>
           ) : (

@@ -1,4 +1,4 @@
-import { IsInt, Min, IsOptional, Max, IsString, IsUrl } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -38,7 +38,7 @@ export class CreateAttemptDto {
     example: 85,
     description: 'Файл в попытке (например практическое задание)',
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   answerFileUrl?: string;
 
@@ -48,7 +48,8 @@ export class CreateAttemptDto {
   })
   @IsOptional()
   @IsInt()
-  @IsOptional()
   @Min(0)
+  @Max(10000)
+  @Type(() => Number)
   score?: number;
 }

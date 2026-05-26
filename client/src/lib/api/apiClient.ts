@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api';
 
@@ -8,15 +10,28 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
-// URL-ы которые НЕ должны триггерить авторефреш
-const NO_REFRESH_URLS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/me'];
+const NO_REFRESH_URLS = ['/auth/login', '/auth/register', '/auth/refresh'];
+
+/** Не показывать toast (частые фоновые запросы). */
+const SILENT_TOAST_SUBSTRINGS = [
+  '/auth/me',
+  '/auth/refresh',
+  '/notifications',
+  '/auth/login',
+  '/auth/register',
+];
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (v: any) => void; reject: (e: any) => void }> = [];
+let failedQueue: Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
 
-const processQueue = (error: any) => {
+const processQueue = (error: unknown) => {
   failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(null)));
   failedQueue = [];
+};
+
+const shouldToast = (url: string, status?: number) => {
+  if (status === 401) return false;
+  return !SILENT_TOAST_SUBSTRINGS.some((s) => url.includes(s));
 };
 
 apiClient.interceptors.response.use(
@@ -24,10 +39,11 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const url: string = originalRequest?.url || '';
+    const status = error.response?.status as number | undefined;
 
-    const isAuthUrl = NO_REFRESH_URLS.some((u) => url.includes(u));
+    const isNoRefreshUrl = NO_REFRESH_URLS.some((u) => url.includes(u));
 
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthUrl) {
+    if (status === 401 && !originalRequest._retry && !isNoRefreshUrl) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -52,6 +68,11 @@ apiClient.interceptors.response.use(
       } finally {
         isRefreshing = false;
       }
+    }
+
+    if (typeof window !== 'undefined' && shouldToast(url, status)) {
+      const msg = getApiErrorMessage(error, 'Ошибка сети или сервера');
+      toast.error(msg, { toastId: `err-${url}-${status}-${msg}`.slice(0, 200) });
     }
 
     return Promise.reject(error);

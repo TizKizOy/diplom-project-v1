@@ -43,6 +43,36 @@ export const certificatesApi = {
     return response.data;
   },
 
+  /** Слушатель: если курс полностью пройден — создаётся сертификат (при наличии шаблона в БД). */
+  issueIfComplete: async (
+    courseId: number,
+  ): Promise<{
+    issued: boolean;
+    newlyIssued: boolean;
+    certificate: ICertificate | null;
+  }> => {
+    const response = await apiClient.post('/certificates/issue-if-complete', {
+      courseId,
+    });
+    return response.data;
+  },
+
+  /** Преподаватель / админ: проверить слушателя и выдать сертификат при полном прохождении. */
+  issueForListenerIfComplete: async (
+    courseId: number,
+    listenerId: number,
+  ): Promise<{
+    issued: boolean;
+    newlyIssued: boolean;
+    certificate: ICertificate | null;
+  }> => {
+    const response = await apiClient.post(
+      '/certificates/issue-for-listener-if-complete',
+      { courseId, listenerId },
+    );
+    return response.data;
+  },
+
   delete: async (id: number) => {
     const response = await apiClient.delete(`/certificates/${id}`);
     return response.data;

@@ -127,6 +127,49 @@ $text-muted: #64748b;
 
 .noTeachers { font-size: 1.3rem; color: $text-muted; }
 
+.enrollPanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.6rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 2rem 2.4rem;
+
+  strong {
+    display: block;
+    font-size: 1.6rem;
+    color: #333;
+    margin-bottom: 0.4rem;
+  }
+
+  p {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #666;
+    line-height: 1.5;
+    max-width: 52rem;
+  }
+}
+
+.enrollPanelBtn {
+  flex-shrink: 0;
+  background: #0066cc;
+  color: #fff !important;
+  padding: 1.2rem 2.4rem;
+  border-radius: 6px;
+  font-size: 1.4rem;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    background: #0052a3;
+  }
+}
+
 .enrollBtn {
   align-self: flex-start;
   background: $blue;
@@ -139,6 +182,59 @@ $text-muted: #64748b;
   transition: background 0.15s;
 
   &:hover { background: #1e429f; }
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.2rem;
+  margin-top: 1.6rem;
+}
+
+.continueBtn {
+  background: #0066cc;
+  color: #fff;
+  padding: 1rem 2rem;
+  border-radius: 0.8rem;
+  font-size: 1.45rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+
+  &:hover { background: #0052a3; }
+}
+
+.outlineBtn {
+  border: 2px solid #1a1d21;
+  color: #1a1d21;
+  padding: 0.85rem 1.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.35rem;
+  font-weight: 500;
+  text-decoration: none;
+  background: #fff;
+  transition: background 0.15s;
+
+  &:hover { background: #f4f5f7; }
+}
+
+.coursePct {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #0066cc;
+}
+
+.globalExtra {
+  margin-top: 2.4rem;
+
+  h3 { font-size: 1.6rem; font-weight: 600; color: #0f172a; margin-bottom: 0.6rem; }
+}
+
+.mutedSmall {
+  font-size: 1.25rem;
+  color: #64748b;
+  line-height: 1.45;
 }
 
 .content {
@@ -156,6 +252,31 @@ $text-muted: #64748b;
   border: 1px solid $border;
   border-radius: 1rem;
   overflow: hidden;
+}
+
+.lessonLocked {
+  opacity: 0.92;
+}
+
+.lessonHeaderLocked {
+  cursor: default;
+  pointer-events: none;
+}
+
+.lockLabel {
+  font-size: 1.2rem;
+  color: $text-muted;
+  font-weight: 500;
+}
+
+.deadlineList {
+  margin: 0.6rem 0 0;
+  padding-left: 1.6rem;
+  font-size: 1.2rem;
+  color: $text-muted;
+  line-height: 1.5;
+
+  li { margin: 0.2rem 0; }
 }
 
 .lessonHeader {
@@ -260,6 +381,78 @@ $text-muted: #64748b;
 }
 
 .empty { color: $text-muted; font-size: 1.4rem; padding: 2.4rem 0; }
+
+.programHint {
+  font-size: 1.35rem;
+  color: $text-muted;
+  line-height: 1.55;
+  margin: -1rem 0 1.6rem;
+  padding: 1.2rem 1.4rem;
+  background: #f8fafc;
+  border-radius: 0.8rem;
+  border: 1px solid $border;
+}
+
+.lessonLocked {
+  opacity: 0.92;
+}
+
+.lessonRowEnrolled {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.4rem;
+  padding: 1.4rem 1.6rem;
+  background: #f8fafc;
+}
+
+.lessonMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.metaChip {
+  font-size: 1.15rem;
+  color: #64748b;
+  background: #fff;
+  border: 1px solid $border;
+  padding: 0.2rem 0.7rem;
+  border-radius: 2rem;
+}
+
+.lessonRowActions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  min-width: 12rem;
+  justify-content: flex-end;
+}
+
+.openLessonBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: $blue;
+  color: #fff;
+  padding: 0.75rem 1.4rem;
+  border-radius: 0.8rem;
+  font-size: 1.35rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+
+  &:hover { background: #1e429f; }
+}
+
+.lockHint {
+  font-size: 1.25rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  text-align: right;
+  max-width: 28rem;
+}
 
 // Listener-specific styles
 .enrolledBadge {

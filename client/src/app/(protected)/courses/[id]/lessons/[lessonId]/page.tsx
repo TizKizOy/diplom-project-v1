@@ -1,15 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { lessonsApi } from '@/lib/api/lessons.api';
 import { materialsApi } from '@/lib/api/materials.api';
 import { tasksApi } from '@/lib/api/tasks.api';
 import { attemptsApi } from '@/lib/api/attempts.api';
-import type { ILesson, IMaterial, ITask } from '@/lib/types';
-import { MATERIAL_TYPE_ICONS, TASK_TYPE, ATTEMPT_STATUS } from '@/lib/constants';
+import { groupsApi } from '@/lib/api/groups.api';
+import { groupListenersApi } from '@/lib/api/groupListeners.api';
+import { getMaterialTitle, type ILesson, type IMaterial, type ITask } from '@/lib/types';
+import {
+  isLessonUnlockedForListener,
+  lessonUnlockReason,
+} from '@/lib/course/lessonUnlock';
+import { MATERIAL_TYPE_ICONS, TASK_TYPE } from '@/lib/constants';
 import Link from 'next/link';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
+import { attemptRowTaskId, attemptAnswerFileUrl } from '@/lib/attempts/attemptTaskId';
 import styles from './page.module.scss';
 
 export default function LessonPage() {
@@ -18,7 +26,6 @@ export default function LessonPage() {
   const { user, checkRole } = useAuth();
   const courseId = Number(params.id);
   const lessonId = Number(params.lessonId);
-  const initialized = useRef(false);
 
   const [lesson, setLesson] = useState<ILesson | null>(null);
   const [materials, setMaterials] = useState<IMaterial[]>([]);
@@ -30,12 +37,12 @@ export default function LessonPage() {
   const isListener = checkRole(['Слушатель']);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [courseId, lessonId, user, isListener]);
 
   const loadData = async () => {
+    setLoading(true);
+    setError('');
     try {
       const [lessonsData, materialsData, tasksData] = await Promise.all([
         lessonsApi.getByCourse(courseId),
@@ -43,8 +50,14 @@ export default function LessonPage() {
         tasksApi.getByCourse(courseId),
       ]);
 
-      const found = lessonsData.find((l) => l.pkIdLesson === lessonId);
-      if (!found) { setError('Урок не найден'); return; }
+      const sortedLessons = [...lessonsData].sort(
+        (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0),
+      );
+      const found = sortedLessons.find((l) => l.pkIdLesson === lessonId);
+      if (!found) {
+        setError('Урок не найден');
+        return;
+      }
       setLesson(found);
       setMaterials(materialsData.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
 
@@ -53,25 +66,55 @@ export default function LessonPage() {
         .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       setTasks(lessonTasks);
 
-      // Загружаем попытки слушателя
-      if (user && isListener && lessonTasks.length > 0) {
-        const attempts = await attemptsApi.getByListener(user.pkIdUser);
+      let attemptsList: import('@/lib/course/courseProgress').AttemptLite[] = [];
+
+      if (user && isListener) {
+        const courseGroups = await groupsApi.getByCourse(courseId);
+        const courseGroupIds = new Set(courseGroups.map((g) => g.pkIdGroup));
+        const enrollments = await groupListenersApi.getByListener(user.pkIdUser);
+        const enrolled = enrollments.some(
+          (e) =>
+            e.fkIdGroup != null && courseGroupIds.has(e.fkIdGroup),
+        );
+        if (!enrolled) {
+          setError('Запишитесь на курс, чтобы открывать уроки.');
+          return;
+        }
+
+        attemptsList = await attemptsApi.getByListener(user.pkIdUser);
+        const lessonIndex = sortedLessons.findIndex((l) => l.pkIdLesson === lessonId);
+        if (
+          lessonIndex >= 0 &&
+          !isLessonUnlockedForListener(lessonIndex, sortedLessons, tasksData, attemptsList)
+        ) {
+          setError(lessonUnlockReason(lessonIndex, sortedLessons, tasksData, attemptsList) || 'Урок недоступен');
+          return;
+        }
+
         const map: Record<number, any> = {};
-        for (const a of attempts) {
-          const taskId = (a as any).fkIdTask;
-          if (taskId) map[taskId] = a;
+        for (const a of attemptsList) {
+          const taskId = attemptRowTaskId(a);
+          if (taskId != null) map[taskId] = a;
         }
         setAttemptMap(map);
+      } else {
+        setAttemptMap({});
       }
-    } catch {
-      setError('Ошибка загрузки урока');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ошибка загрузки урока'));
     } finally {
       setLoading(false);
     }
   };
 
+  const getTaskAttempt = (taskId: number) => {
+    const n = Number(taskId);
+    if (!Number.isFinite(n)) return null;
+    return attemptMap[n] ?? null;
+  };
+
   const getTaskStatus = (taskId: number) => {
-    const a = attemptMap[taskId];
+    const a = getTaskAttempt(taskId);
     if (!a) return null;
     return a.statusName;
   };
@@ -79,13 +122,13 @@ export default function LessonPage() {
   const getMaterialIcon = (typeName: string, typeId: number) => {
     if (MATERIAL_TYPE_ICONS[typeId]) return MATERIAL_TYPE_ICONS[typeId];
     const t = typeName?.toLowerCase();
-    if (t?.includes('видео')) return '🎬';
-    if (t?.includes('pdf')) return '📄';
-    if (t?.includes('презент')) return '📊';
-    return '🔗';
+    if (t?.includes('видео')) return 'Видео';
+    if (t?.includes('pdf')) return 'PDF';
+    if (t?.includes('презент')) return 'Презентация';
+    return 'Ссылка';
   };
 
-  const completedTasks = tasks.filter((t) => getTaskStatus(t.pkIdTask) === 'Принято').length;
+  const completedTasks = tasks.filter((t) => getTaskStatus(Number(t.pkIdTask)) === 'Принято').length;
 
   if (loading) return <div className={styles.loading}><div className={styles.spinner} /></div>;
   if (error || !lesson) return (
@@ -129,7 +172,7 @@ export default function LessonPage() {
       {/* Materials */}
       {materials.length > 0 && (
         <div className={styles.card}>
-          <h2>📎 Материалы урока</h2>
+          <h2>Материалы урока</h2>
           <div className={styles.materialsList}>
             {materials.map((m) => (
               <a
@@ -139,9 +182,9 @@ export default function LessonPage() {
                 rel="noopener noreferrer"
                 className={styles.materialItem}
               >
-                <span className={styles.matIcon}>{getMaterialIcon(m.typeName, m.fkIdTypeMaterial)}</span>
+                <span className={styles.matIcon}>{getMaterialIcon(m.typeName, m.fkIdTypeMaterial ?? 0)}</span>
                 <div className={styles.matInfo}>
-                  <strong>{m.title}</strong>
+                  <strong>{getMaterialTitle(m)}</strong>
                   {m.description && <span>{m.description}</span>}
                   <span className={styles.matType}>{m.typeName}</span>
                 </div>
@@ -155,18 +198,22 @@ export default function LessonPage() {
       {/* Tasks */}
       {tasks.length > 0 && (
         <div className={styles.card}>
-          <h2>📝 Задания</h2>
+          <h2>Задания</h2>
           <div className={styles.tasksList}>
             {tasks.map((t) => {
-              const status = getTaskStatus(t.pkIdTask);
-              const isTest = t.taskTypeName === 'Тест' || (t as any).fkIdTypeTasks === TASK_TYPE.TEST;
-              const hasTestId = !!(t as any).fkIdTest;
+              const tid = Number(t.pkIdTask);
+              const status = getTaskStatus(tid);
+              const att = getTaskAttempt(tid);
+              const fileUrl = att ? attemptAnswerFileUrl(att) : '';
+              const taskTypeId = t.typeId ?? (t as { fkIdTypeTasks?: number }).fkIdTypeTasks;
+              const isTest = taskTypeId === TASK_TYPE.TEST;
+              const hasTestId = !!t.fkIdTest;
               const taskHref = isTest && hasTestId
-                ? `/courses/${courseId}/lessons/${lessonId}/tasks/${t.pkIdTask}/test`
-                : `/courses/${courseId}/lessons/${lessonId}/tasks/${t.pkIdTask}`;
+                ? `/courses/${courseId}/lessons/${lessonId}/tasks/${tid}/test`
+                : `/courses/${courseId}/lessons/${lessonId}/tasks/${tid}`;
 
               return (
-                <div key={t.pkIdTask} className={`${styles.taskItem} ${status === 'Принято' ? styles.taskDone : ''}`}>
+                <div key={tid} className={`${styles.taskItem} ${status === 'Принято' ? styles.taskDone : ''}`}>
                   <div className={styles.taskLeft}>
                     <div className={styles.taskTop}>
                       <span className={styles.taskTypeBadge}>{t.taskTypeName}</span>
@@ -180,17 +227,36 @@ export default function LessonPage() {
                     <strong className={styles.taskTitle}>{t.title || t.taskTitle}</strong>
                     {t.description && <p className={styles.taskDesc}>{t.description}</p>}
                     <div className={styles.taskMeta}>
-                      <span>⭐ {t.maxScore} баллов</span>
+                      <span>Макс. {t.maxScore} баллов</span>
+                      {status === 'Принято' &&
+                        att &&
+                        att.score != null &&
+                        att.score !== undefined && (
+                          <span className={styles.scoreEarned}>
+                            Балл: {att.score} / {t.maxScore}
+                          </span>
+                        )}
                       {t.deadline && (
                         <span className={new Date(t.deadline) < new Date() ? styles.overdue : ''}>
-                          📅 до {new Date(t.deadline).toLocaleDateString('ru-RU')}
+                          Срок: {new Date(t.deadline).toLocaleDateString('ru-RU')}
                         </span>
+                      )}
+                      {status === 'Принято' && fileUrl && (
+                        <a
+                          className={styles.answerLink}
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Ссылка на ответ
+                        </a>
                       )}
                     </div>
                   </div>
                   <div className={styles.taskRight}>
                     {status === 'Принято' ? (
-                      <span className={styles.doneIcon}>✅</span>
+                      <span className={styles.doneLabel}>Готово</span>
                     ) : (
                       <Link href={taskHref} className={styles.taskBtn}>
                         {status === 'На проверке' ? 'Просмотр' :

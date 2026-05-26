@@ -41,6 +41,10 @@ export class MaterialsService {
     return await this.getMaterials({ courseId: courseId });
   }
 
+  async getByLesson(lessonId: number): Promise<IMaterial[]> {
+    return await this.getMaterials({ lessonId });
+  }
+
   async getDeleted(): Promise<IMaterial[]> {
     const materials = await db.getDeletedMaterials();
     if (!materials || materials.length === 0) {
@@ -51,7 +55,15 @@ export class MaterialsService {
 
   async create(dto: CreateMaterialDto, adminId: number): Promise<IMaterial> {
     try {
-      return await db.createMaterial(dto, adminId);
+      const desc = dto.description?.trim();
+      const normalized: CreateMaterialDto = {
+        ...dto,
+        description:
+          desc && desc.length >= 3
+            ? desc
+            : 'Краткое описание материала.',
+      };
+      return await db.createMaterial(normalized, adminId);
     } catch (e: any) {
       if (e.message && e.message.includes('не найден') || e.message && e.message.includes('уже существует')) {
         throw new NotFoundException(e.message);

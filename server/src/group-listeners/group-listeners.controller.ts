@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GroupListenersService } from './group-listeners.service';
@@ -22,6 +23,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
 
 @ApiTags('Group-listeners')
 @ApiBearerAuth()
@@ -49,11 +51,19 @@ export class GroupListenersController {
   }
 
   @Get('listener/:listenerId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить группы конкретного слушателя' })
   async getByListener(
     @Param('listenerId', ParseIntPipe) listenerId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IGroupListener[]> {
+    const canViewAny =
+      user.roleName === Role.ADMIN || user.roleName === Role.TEACHER;
+    if (!canViewAny && user.pkIdUser !== listenerId) {
+      throw new ForbiddenException(
+        'Нет прав на просмотр записей другого слушателя',
+      );
+    }
     return await this.groupListenersService.getByListener(listenerId);
   }
 
@@ -68,9 +78,17 @@ export class GroupListenersController {
   @ApiOperation({ summary: 'Добавить слушателя в группу' })
   async create(
     @Body() body: CreateGroupListenerDto,
-    @CurrentUser('pkIdUser') adminId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IGroupListener> {
-    return await this.groupListenersService.create(body, adminId);
+    if (
+      user.roleName === Role.LISTENER &&
+      body.listenerId !== user.pkIdUser
+    ) {
+      throw new ForbiddenException(
+        'Слушатель может записаться на курс только от своего имени',
+      );
+    }
+    return await this.groupListenersService.create(body, user.pkIdUser);
   }
 
   @Delete(':id')

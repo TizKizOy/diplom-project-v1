@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth'; // <-- Убедись, что импортируешь отсюда
+import { useAuth } from '@/lib/hooks/useAuth';
 import { usersApi, type ICreateUserDto } from '@/lib/api/users.api';
 import { type IUser } from '@/lib/types/index';
+import { useAppDialog } from '@/lib/hooks/useAppDialog';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import styles from './page.module.scss';
 
 const ROLE_OPTIONS = [
@@ -13,10 +15,11 @@ const ROLE_OPTIONS = [
 ];
 
 export default function AdminUsersPage() {
-  const { checkRole, isLoading, user } = useAuth(); // <-- Добавили isLoading и user
+  const { checkRole, isLoading, user } = useAuth();
+  const { alert, confirm } = useAppDialog();
 
   const [users, setUsers] = useState<IUser[]>([]);
-  const [loading, setLoading] = useState(true); // Локальная загрузка таблицы
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<IUser | null>(null);
@@ -32,21 +35,18 @@ export default function AdminUsersPage() {
   });
 
   useEffect(() => {
-    // 1. Ждем пока AuthProvider загрузит пользователя
     if (isLoading) {
       return;
     }
 
-    // 2. Если загрузка закончилась, проверяем права
     if (!checkRole(['Администратор'])) {
       setError('Доступ запрещён. Требуется роль Администратор.');
       setLoading(false);
       return;
     }
 
-    // 3. Если права есть — грузим данные
     loadUsers();
-  }, [isLoading, checkRole]); // <-- Зависимости: ждем изменения isLoading или checkRole
+  }, [isLoading, checkRole]);
 
   const loadUsers = async () => {
     try {
@@ -62,7 +62,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  // ... (функции handleSubmit, handleEdit, handleDelete, resetForm без изменений) ...
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -77,7 +76,7 @@ export default function AdminUsersPage() {
       if (formData.password && formData.password.length > 0)
         payload.password = formData.password;
       else if (!editingUser) {
-        alert('Пароль обязателен');
+        await alert('Пароль обязателен');
         return;
       }
 
@@ -86,8 +85,8 @@ export default function AdminUsersPage() {
 
       resetForm();
       await loadUsers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка');
+    } catch (err: unknown) {
+      await alert(getApiErrorMessage(err, 'Ошибка'));
     }
   };
 
@@ -110,12 +109,12 @@ export default function AdminUsersPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Удалить?')) return;
+    if (!(await confirm('Удалить пользователя?'))) return;
     try {
       await usersApi.delete(id);
       await loadUsers();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка');
+    } catch (err: unknown) {
+      await alert(getApiErrorMessage(err, 'Ошибка'));
     }
   };
 
@@ -135,12 +134,10 @@ export default function AdminUsersPage() {
 
   // --- РЕНДЕРИНГ ---
 
-  // 1. Пока AuthProvider грузит пользователя - показываем общий спиннер
   if (isLoading) {
     return <div className={styles.loading}>Проверка прав доступа...</div>;
   }
 
-  // 2. Если права не прошли - показываем ошибку
   if (error) {
     return (
       <div className={styles.container}>
@@ -157,7 +154,6 @@ export default function AdminUsersPage() {
     );
   }
 
-  // 3. Пока грузится таблица пользователей - локальный спиннер
   if (loading) {
     return (
       <div className={styles.loading}>Загрузка списка пользователей...</div>
@@ -320,13 +316,13 @@ export default function AdminUsersPage() {
                       onClick={() => handleEdit(u)}
                       className={styles.actionBtn}
                     >
-                      ✏️
+                      Ред.
                     </button>
                     <button
                       onClick={() => handleDelete(u.pkIdUser)}
                       className={styles.actionBtnDelete}
                     >
-                      🗑️
+                      Уд.
                     </button>
                   </td>
                 </tr>

@@ -1,5 +1,5 @@
 import { IsInt, Min, Max, IsBoolean, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateTestDto {
@@ -9,11 +9,15 @@ export class CreateTestDto {
     required: false,
     nullable: true,
   })
+  @Transform(({ value }) => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  })
   @IsOptional()
   @IsInt({ message: 'Лимит времени должен быть числом' })
   @Min(1, { message: 'Лимит времени ≥ 1 минуты' })
-  @Type(() => Number)
-  timeLimitMinutes?: number | null;
+  timeLimitMinutes?: number;
 
   @ApiProperty({
     description: 'Перемешивать вопросы',

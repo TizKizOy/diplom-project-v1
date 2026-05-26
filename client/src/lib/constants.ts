@@ -11,6 +11,15 @@ export const COURSE_STATUS_NAMES: Record<number, string> = {
   3: 'Архивирован',
 };
 
+/** Курс доступен для записи слушателем (учитывает ответ API без fkIdStatus до обновления БД). */
+export function isPublishedCourse(
+  course: { fkIdStatus?: number; statusName?: string } | null | undefined,
+): boolean {
+  if (!course) return false;
+  if (Number(course.fkIdStatus) === COURSE_STATUS.PUBLISHED) return true;
+  return course.statusName === COURSE_STATUS_NAMES[COURSE_STATUS.PUBLISHED];
+}
+
 // Статусы попыток
 export const ATTEMPT_STATUS = {
   PENDING: 1,    // На проверке
@@ -25,6 +34,15 @@ export const ATTEMPT_STATUS_NAMES: Record<number, string> = {
   3: 'Отклонено',
   4: 'На доработке',
 };
+
+/** Сопоставление названия статуса (как в API) с числовым id для PATCH оценки. */
+export function attemptStatusNameToId(
+  statusName: string | undefined | null,
+): number | undefined {
+  if (!statusName) return undefined;
+  const entry = Object.entries(ATTEMPT_STATUS_NAMES).find(([, n]) => n === statusName);
+  return entry ? Number(entry[0]) : undefined;
+}
 
 // Типы заданий
 export const TASK_TYPE = {
@@ -48,10 +66,10 @@ export const MATERIAL_TYPE = {
 } as const;
 
 export const MATERIAL_TYPE_ICONS: Record<number, string> = {
-  1: '🎬',
-  2: '📊',
-  3: '📄',
-  4: '🔗',
+  1: 'Видео',
+  2: 'Презентация',
+  3: 'PDF',
+  4: 'Ссылка',
 };
 
 // Роли

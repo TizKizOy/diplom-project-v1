@@ -1,19 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { coursesApi } from '@/lib/api/courses.api';
 import { groupListenersApi } from '@/lib/api/groupListeners.api';
 import { groupsApi } from '@/lib/api/groups.api';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
 import type { ICourse } from '@/lib/types';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { COURSE_STATUS, ROLES } from '@/lib/constants';
+import { COURSE_STATUS, isPublishedCourse, ROLES } from '@/lib/constants';
+import { listenerEnrolledCourseIds } from '@/lib/course/enrollmentFromApi';
 import Link from 'next/link';
 import styles from './page.module.scss';
 
 export default function CoursesPage() {
   const { user, checkRole } = useAuth();
-  const initialized = useRef(false);
   const [courses, setCourses] = useState<ICourse[]>([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -28,10 +28,8 @@ export default function CoursesPage() {
   const [teacherCourseIds, setTeacherCourseIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [user, isListener, isTeacher]);
 
   const loadData = async () => {
     try {
@@ -43,20 +41,36 @@ export default function CoursesPage() {
 
       // Для преподавателя — загружаем его назначения
       if (isTeacher && user) {
-        const assignments = await courseTeachersApi.getByTeacher(user.pkIdUser);
-        setTeacherCourseIds(new Set(assignments.map((a: any) => a.fkIdCourse)));
+        const [assignments, allGroups] = await Promise.all([
+          courseTeachersApi.getByTeacher(user.pkIdUser),
+          groupsApi.getAll(),
+        ]);
+        const ids = new Set<number>();
+        for (const a of assignments as { fkIdCourse?: number }[]) {
+          if (a.fkIdCourse != null) ids.add(Number(a.fkIdCourse));
+        }
+        for (const g of allGroups as { fkIdCourse?: number; fkIdCurator?: number | null }[]) {
+          if (
+            g.fkIdCurator != null &&
+            Number(g.fkIdCurator) === user.pkIdUser &&
+            g.fkIdCourse != null
+          ) {
+            ids.add(Number(g.fkIdCourse));
+          }
+        }
+        setTeacherCourseIds(ids);
       }
 
       // Для слушателя — определяем на какие курсы уже записан
       if (isListener && user) {
         const enrollments = await groupListenersApi.getByListener(user.pkIdUser);
         const allGroups = await groupsApi.getAll();
-        const ids = new Set<number>();
-        for (const e of enrollments) {
-          const group = allGroups.find((g) => g.pkIdGroup === (e as any).fkIdGroup);
-          if (group) ids.add(group.fkIdCourse);
-        }
-        setEnrolledCourseIds(ids);
+        setEnrolledCourseIds(
+          listenerEnrolledCourseIds(
+            enrollments as { fkIdCourse?: number; fkIdGroup?: number }[],
+            allGroups,
+          ),
+        );
       }
     } catch (e) {
       console.error(e);
@@ -169,7 +183,7 @@ export default function CoursesPage() {
                     </span>
                   )}
                   {course.tags && <span className={styles.tags}>{course.tags}</span>}
-                  {enrolled && <span className={styles.enrolledBadge}>✓ Записан</span>}
+                  {enrolled && <span className={styles.enrolledBadge}>Записан</span>}
                 </div>
 
                 <h3 className={styles.cardTitle}>{course.title}</h3>
@@ -178,14 +192,19 @@ export default function CoursesPage() {
                 </p>
 
                 <div className={styles.cardDates}>
-                  📅 {course.startDate && new Date(course.startDate).toLocaleDateString('ru-RU')} — {course.endDate && new Date(course.endDate).toLocaleDateString('ru-RU')}
+                  {course.startDate && new Date(course.startDate).toLocaleDateString('ru-RU')} — {course.endDate && new Date(course.endDate).toLocaleDateString('ru-RU')}
                 </div>
 
                 <div className={styles.cardActions}>
                   <Link href={`/courses/${course.pkIdCourse}`} className={styles.btnDetails}>
                     Подробнее
                   </Link>
-                  {isListener && course.fkIdStatus === COURSE_STATUS.PUBLISHED && !enrolled && (
+                  {isListener && isPublishedCourse(course) && enrolled && (
+                    <Link href={`/courses/${course.pkIdCourse}`} className={styles.btnEnroll}>
+                      Перейти к курсу
+                    </Link>
+                  )}
+                  {isListener && isPublishedCourse(course) && !enrolled && (
                     <Link href={`/courses/${course.pkIdCourse}/enroll`} className={styles.btnEnroll}>
                       Записаться
                     </Link>

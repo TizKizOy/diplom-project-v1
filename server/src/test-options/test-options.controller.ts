@@ -45,7 +45,7 @@ export class TestOptionsController {
   }
 
   @Get('question/:questionId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить варианты по ID вопроса' })
   async getByQuestion(
     @Param('questionId', ParseIntPipe) questionId: number,
@@ -53,18 +53,18 @@ export class TestOptionsController {
     return await this.testOptionsService.getByQuestion(questionId);
   }
 
-  @Get(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({ summary: 'Получить вариант ответа по ID' })
-  async getById(@Param('id', ParseIntPipe) id: number): Promise<ITestOption> {
-    return await this.testOptionsService.getById(id);
-  }
-
   @Get('deleted/list')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Получить удалённые варианты ответов' })
   async getDeleted(): Promise<ITestOption[]> {
     return await this.testOptionsService.getDeleted();
+  }
+
+  @Get(':id')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({ summary: 'Получить вариант ответа по ID' })
+  async getById(@Param('id', ParseIntPipe) id: number): Promise<ITestOption> {
+    return await this.testOptionsService.getById(id);
   }
 
   @Post()

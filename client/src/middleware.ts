@@ -5,18 +5,22 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get('accessToken')?.value;
 
-  const publicRoutes = ['/', '/auth'];
-  const protectedRoutes = ['/main', '/account', '/courses', '/admin'];
+  const protectedPrefixes = [
+    '/main',
+    '/account',
+    '/courses',
+    '/admin',
+    '/messages',
+    '/notifications',
+    '/certificates',
+    '/help',
+  ];
+  const isProtectedRoute = protectedPrefixes.some((route) =>
+    pathname.startsWith(route),
+  );
 
-  if (publicRoutes.includes(pathname) && accessToken) {
-    return NextResponse.redirect(new URL('/main', request.url));
-  }
-
-  if (
-    protectedRoutes.some((route) => pathname.startsWith(route)) &&
-    !accessToken
-  ) {
-    return NextResponse.redirect(new URL('/auth', request.url));
+  if (isProtectedRoute && !accessToken) {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
   return NextResponse.next();

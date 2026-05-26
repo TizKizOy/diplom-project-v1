@@ -10,27 +10,47 @@ import { IRestoredResult } from '../common/interfaces/restore.interface';
 import { CreateTestQuestionDto } from './dto/create-test-question.dto';
 import { UpdateTestQuestionDto } from './dto/update-test-question.dto';
 
+/** prGetTestQuestionsWithOptions даёт по строке на каждый вариант ответа — оставляем один объект на вопрос. */
+function distinctQuestionsFromJoinedRows(
+  rows: Record<string, unknown>[] | null | undefined,
+  fallbackTestId?: number,
+): ITestQuestion[] {
+  if (!rows?.length) return [];
+  const byId = new Map<number, ITestQuestion>();
+  for (const row of rows) {
+    const id = Number(row.pkIdQuestion);
+    if (!Number.isFinite(id) || byId.has(id)) continue;
+    const sortRaw =
+      row.sortOrder ?? row.questionSortOrder ?? row.QuestionSortOrder ?? 0;
+    const fkRaw = row.fkIdTest ?? fallbackTestId;
+    const fkIdTest = Number(fkRaw);
+    byId.set(id, {
+      pkIdQuestion: id,
+      fkIdTest: Number.isFinite(fkIdTest) ? fkIdTest : (fallbackTestId as number),
+      questionText: String(row.questionText ?? ''),
+      sortOrder: Number(sortRaw) || 0,
+      score: Number(row.score ?? 1),
+      isDeleted: Boolean(row.isDeleted),
+    });
+  }
+  return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 @Injectable()
 export class TestQuestionsService {
-  async getTestQuestions(filter: {
-    id?: number;
-    testId?: number;
-    isDeleted?: boolean;
-  }): Promise<ITestQuestion[]> {
-    const questions = await db.getTestQuestions(filter);
-    if (!questions || questions.length === 0) {
-      throw new NotFoundException('Вопросы не найдены');
-    }
-    return questions;
-  }
-
   async getAll(): Promise<ITestQuestion[]> {
-    return await this.getTestQuestions({});
+    const rows = await db.getTestQuestions({});
+    return distinctQuestionsFromJoinedRows(
+      rows as unknown as Record<string, unknown>[],
+    );
   }
 
   async getById(id: number): Promise<ITestQuestion> {
-    const questions = await db.getTestQuestions({ id });
-    const question = questions[0];
+    const rows = await db.getTestQuestions({ id });
+    const list = distinctQuestionsFromJoinedRows(
+      rows as unknown as Record<string, unknown>[],
+    );
+    const question = list[0];
     if (!question) {
       throw new NotFoundException(`Вопрос с id=${id} не найден`);
     }
@@ -38,7 +58,11 @@ export class TestQuestionsService {
   }
 
   async getByTest(testId: number): Promise<ITestQuestion[]> {
-    return await this.getTestQuestions({ testId });
+    const rows = await db.getTestQuestions({ testId });
+    return distinctQuestionsFromJoinedRows(
+      rows as unknown as Record<string, unknown>[],
+      testId,
+    );
   }
 
   async getDeleted(): Promise<ITestQuestion[]> {
@@ -46,7 +70,9 @@ export class TestQuestionsService {
     if (!questions || questions.length === 0) {
       throw new NotFoundException('Удалённые вопросы не найдены');
     }
-    return questions;
+    return distinctQuestionsFromJoinedRows(
+      questions as unknown as Record<string, unknown>[],
+    );
   }
 
   async create(

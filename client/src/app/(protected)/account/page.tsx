@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
+import { authApi } from '@/lib/api/auth.api';
 import type { IUpdateUserDto } from '@/lib/api/users.api';
 import styles from './page.module.scss';
 
@@ -21,7 +23,7 @@ export default function AccountPage() {
     password: '',
   });
 
-  // Заполняем форму из authUser (не делаем отдельный API запрос)
+  // Заполняем форму из authUser 
   useEffect(() => {
     if (authUser) {
       setFormData({
@@ -58,9 +60,9 @@ export default function AccountPage() {
         updateData.login = formData.login;
       }
 
-      const updated = await usersApi.update(authUser.pkIdUser, updateData);
-      // Обновляем контекст
-      setUser({ ...authUser, ...updated });
+      await usersApi.update(authUser.pkIdUser, updateData);
+      const fresh = await authApi.me();
+      setUser(fresh);
       setIsEditing(false);
       setSuccess('Профиль успешно обновлён');
       setFormData((prev) => ({ ...prev, password: '' }));
@@ -72,6 +74,8 @@ export default function AccountPage() {
   };
 
   const isAdmin = checkRole(['Администратор']);
+  const isTeacher = checkRole(['Преподаватель']);
+  const isListener = checkRole(['Слушатель']);
 
   if (!authUser) return <div className={styles.loading}>Загрузка...</div>;
 
@@ -199,6 +203,38 @@ export default function AccountPage() {
             </div>
           )}
         </form>
+      </div>
+
+      <div className={styles.dashCard}>
+        <h2 className={styles.dashTitle}>Быстрый доступ</h2>
+        <div className={styles.dashLinks}>
+          <Link className={styles.dashLink} href="/main">Моё обучение</Link>
+          <Link className={styles.dashLink} href="/courses">Каталог курсов</Link>
+          {isAdmin && (
+            <>
+              <Link className={styles.dashLink} href="/admin/users">Пользователи</Link>
+              <Link className={styles.dashLink} href="/admin/courses">Курсы (администрирование)</Link>
+              <Link className={styles.dashLink} href="/admin/groups">Группы</Link>
+              <Link className={styles.dashLink} href="/admin/analytics">Аналитика</Link>
+              <Link className={styles.dashLink} href="/admin/reports">Отчёты</Link>
+              <Link className={styles.dashLink} href="/admin/logs">Журнал действий</Link>
+            </>
+          )}
+          {isTeacher && !isAdmin && (
+            <>
+              <Link className={styles.dashLink} href="/admin/groups">Группы</Link>
+              <Link className={styles.dashLink} href="/admin/analytics">Аналитика по курсам</Link>
+            </>
+          )}
+          {isListener && !isAdmin && (
+            <Link className={styles.dashLink} href="/certificates">Сертификаты</Link>
+          )}
+          {isAdmin && (
+            <Link className={styles.dashLink} href="/certificates">Сертификаты (все)</Link>
+          )}
+          <Link className={styles.dashLink} href="/messages">Сообщения</Link>
+          <Link className={styles.dashLink} href="/notifications">Уведомления</Link>
+        </div>
       </div>
     </div>
   );

@@ -46,6 +46,11 @@ export class MessageService {
     return await this.getMessages({ receiverId });
   }
 
+  async getUnreadByReceiver(receiverId: number): Promise<IMessage[]> {
+    const list = await this.getByReceiver(receiverId);
+    return list.filter((m) => !m.isRead);
+  }
+
   async getDeleted(): Promise<IMessage[]> {
     const messages = await db.getDeletedMessages();
     if (!messages || messages.length === 0) {

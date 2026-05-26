@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { coursesApi } from '@/lib/api/courses.api';
 import { usersApi } from '@/lib/api/users.api';
@@ -10,14 +10,16 @@ import { groupListenersApi } from '@/lib/api/groupListeners.api';
 import { attemptsApi } from '@/lib/api/attempts.api';
 import { notificationsApi } from '@/lib/api/notifications.api';
 import { tasksApi } from '@/lib/api/tasks.api';
+import { lessonsApi } from '@/lib/api/lessons.api';
 import { COURSE_STATUS, ATTEMPT_STATUS, ROLES } from '@/lib/constants';
+import { courseProgressPercent } from '@/lib/course/courseProgress';
+import { listenerEnrollmentPairs } from '@/lib/course/enrollmentFromApi';
 import type { ICourse, IGroup } from '@/lib/types';
 import Link from 'next/link';
 import styles from './page.module.scss';
 
 export default function MainPage() {
-  const { user, checkRole } = useAuth();
-  const initialized = useRef(false);
+  const { user, checkRole, isLoading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
 
   // Admin
@@ -32,19 +34,22 @@ export default function MainPage() {
   const [myEnrollments, setMyEnrollments] = useState<{ group: IGroup; course: ICourse }[]>([]);
   const [myAttempts, setMyAttempts] = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [courseProgressPct, setCourseProgressPct] = useState<Record<number, number>>({});
 
   const isAdmin = checkRole([ROLES.ADMIN]);
   const isTeacher = checkRole([ROLES.TEACHER]);
   const isListener = checkRole([ROLES.LISTENER]);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (authLoading || !user) return;
     load();
-  }, []);
+  }, [authLoading, user]);
 
   const load = async () => {
-    if (!user) return;
+    const currentUser = user;
+    if (!currentUser) return;
+
+    setLoading(true);
     try {
       if (isAdmin) {
         const [courses, users, groups, attempts] = await Promise.all([
@@ -64,40 +69,79 @@ export default function MainPage() {
         });
         setRecentCourses(courses.slice(0, 6));
       } else if (isTeacher) {
-        const assignments = await courseTeachersApi.getByTeacher(user.pkIdUser);
-        const courseIds = [...new Set(assignments.map((a: any) => a.fkIdCourse))];
+        const [assignments, allGroups] = await Promise.all([
+          courseTeachersApi.getByTeacher(currentUser.pkIdUser),
+          groupsApi.getAll(),
+        ]);
+        const courseIds = new Set<number>();
+        for (const a of assignments as { fkIdCourse?: number }[]) {
+          if (a.fkIdCourse != null) courseIds.add(Number(a.fkIdCourse));
+        }
+        for (const g of allGroups as { fkIdCourse?: number; fkIdCurator?: number | null }[]) {
+          if (
+            g.fkIdCurator != null &&
+            Number(g.fkIdCurator) === currentUser.pkIdUser &&
+            g.fkIdCourse != null
+          ) {
+            courseIds.add(Number(g.fkIdCourse));
+          }
+        }
         const allCourses = await coursesApi.getAll();
-        const filtered = allCourses.filter((c) => courseIds.includes(c.pkIdCourse));
+        const filtered = allCourses.filter((c) => courseIds.has(c.pkIdCourse));
         setMyCourses(filtered);
-        // Попытки только по заданиям своих курсов
         const allAttempts = await attemptsApi.getByStatus(ATTEMPT_STATUS.PENDING);
         const allTaskIds = new Set<number>();
         for (const cId of courseIds) {
           try {
             const tasks = await tasksApi.getByCourse(cId);
             tasks.forEach((t) => allTaskIds.add(t.pkIdTask));
-          } catch {}
-        }
-        setPendingAttempts(allAttempts.filter((a: any) => allTaskIds.has(a.fkIdTask)));
-      } else if (isListener) {
-        const [enrollments, allGroups, allCourses, attempts, notifications] = await Promise.all([
-          groupListenersApi.getByListener(user.pkIdUser),
-          groupsApi.getAll(),
-          coursesApi.getByStatus(COURSE_STATUS.PUBLISHED),
-          attemptsApi.getByListener(user.pkIdUser),
-          notificationsApi.getByUser(user.pkIdUser),
-        ]);
-        // Build enrollment list
-        const enrolled: { group: IGroup; course: ICourse }[] = [];
-        for (const e of enrollments) {
-          const group = allGroups.find((g) => g.pkIdGroup === (e as any).fkIdGroup);
-          if (group) {
-            const course = allCourses.find((c) => c.pkIdCourse === group.fkIdCourse);
-            if (course) enrolled.push({ group, course });
+          } catch {
+            /* курс без заданий */
           }
         }
+        setPendingAttempts(
+          allAttempts.filter((a) => {
+            const tid = Number(a.fkIdTask);
+            return Number.isFinite(tid) && allTaskIds.has(tid);
+          }),
+        );
+      } else if (isListener) {
+        const [enrollments, allGroups, allCourses, attempts, notifications] = await Promise.all([
+          groupListenersApi.getByListener(currentUser.pkIdUser),
+          groupsApi.getAll(),
+          coursesApi.getByStatus(COURSE_STATUS.PUBLISHED),
+          attemptsApi.getByListener(currentUser.pkIdUser),
+          notificationsApi.getByUser(currentUser.pkIdUser),
+        ]);
+        const enrolled = listenerEnrollmentPairs(
+          enrollments as { fkIdCourse?: number; fkIdGroup?: number; groupName?: string }[],
+          allGroups,
+          allCourses,
+        );
         setMyEnrollments(enrolled);
         setMyAttempts(attempts);
+        const progressMap: Record<number, number> = {};
+        await Promise.all(
+          enrolled.map(async ({ course }) => {
+            try {
+              const [ls, ts] = await Promise.all([
+                lessonsApi.getByCourse(course.pkIdCourse),
+                tasksApi.getByCourse(course.pkIdCourse),
+              ]);
+              const sorted = [...ls].sort(
+                (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0),
+              );
+              progressMap[course.pkIdCourse] = courseProgressPercent(
+                sorted,
+                ts,
+                attempts,
+              );
+            } catch {
+              progressMap[course.pkIdCourse] = 0;
+            }
+          }),
+        );
+        setCourseProgressPct(progressMap);
         setUnreadNotifications(notifications.filter((n: any) => !n.isRead).length);
       }
     } catch (e) {
@@ -126,24 +170,24 @@ export default function MainPage() {
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <div className={styles.statTop}><span className={styles.statIcon}>📚</span></div>
+          <div className={styles.statTop}><span className={styles.statIcon}>К</span></div>
           <div className={styles.statValue}>{stats.courses}</div>
           <div className={styles.statLabel}>Всего курсов</div>
           <div className={styles.statSub}>{stats.published} опубликовано</div>
         </div>
         <div className={styles.statCard}>
-          <div className={styles.statTop}><span className={styles.statIcon}>👥</span></div>
+          <div className={styles.statTop}><span className={styles.statIcon}>У</span></div>
           <div className={styles.statValue}>{stats.users}</div>
           <div className={styles.statLabel}>Пользователей</div>
           <div className={styles.statSub}>{stats.teachers} преп. · {stats.listeners} слуш.</div>
         </div>
         <div className={styles.statCard}>
-          <div className={styles.statTop}><span className={styles.statIcon}>🏫</span></div>
+          <div className={styles.statTop}><span className={styles.statIcon}>Г</span></div>
           <div className={styles.statValue}>{stats.groups}</div>
           <div className={styles.statLabel}>Учебных групп</div>
         </div>
         <div className={`${styles.statCard} ${stats.pendingAttempts > 0 ? styles.statAlert : ''}`}>
-          <div className={styles.statTop}><span className={styles.statIcon}>📝</span></div>
+          <div className={styles.statTop}><span className={styles.statIcon}>П</span></div>
           <div className={styles.statValue}>{stats.pendingAttempts}</div>
           <div className={styles.statLabel}>На проверке</div>
           <div className={styles.statSub}>работ ждут проверки</div>
@@ -154,12 +198,12 @@ export default function MainPage() {
         <h2>Быстрые действия</h2>
         <div className={styles.actionsGrid}>
           {[
-            { href: '/admin/users', icon: '👤', label: 'Пользователи', desc: 'Управление аккаунтами' },
-            { href: '/admin/groups', icon: '🏫', label: 'Группы', desc: 'Учебные группы и слушатели' },
-            { href: '/admin/analytics', icon: '📊', label: 'Аналитика', desc: 'Статистика платформы' },
-            { href: '/admin/reports', icon: '📋', label: 'Отчёты', desc: 'Экспорт в PDF и Excel' },
-            { href: '/admin/logs', icon: '🗒️', label: 'Журнал', desc: 'История действий' },
-            { href: '/courses', icon: '📚', label: 'Каталог курсов', desc: 'Все курсы платформы' },
+            { href: '/admin/users', icon: 'У', label: 'Пользователи', desc: 'Управление аккаунтами' },
+            { href: '/admin/groups', icon: 'Г', label: 'Группы', desc: 'Учебные группы и слушатели' },
+            { href: '/admin/analytics', icon: 'А', label: 'Аналитика', desc: 'Статистика платформы' },
+            { href: '/admin/reports', icon: 'О', label: 'Отчёты', desc: 'Экспорт PDF, Excel (.xlsx), Word' },
+            { href: '/admin/logs', icon: 'Ж', label: 'Журнал', desc: 'История действий' },
+            { href: '/courses', icon: 'К', label: 'Каталог курсов', desc: 'Все курсы платформы' },
           ].map((a) => (
             <Link key={a.href} href={a.href} className={styles.actionCard}>
               <span className={styles.actionIcon}>{a.icon}</span>
@@ -206,14 +250,13 @@ export default function MainPage() {
         </div>
         {pendingAttempts.length > 0 && (
           <div className={styles.alertBadge}>
-            📝 {pendingAttempts.length} работ на проверке
+            {pendingAttempts.length} работ на проверке
           </div>
         )}
       </div>
 
       {myCourses.length === 0 ? (
         <div className={styles.emptyState}>
-          <span>📚</span>
           <h3>Курсов пока нет</h3>
           <p>Администратор назначит вас на курсы</p>
           <Link href="/courses" className={styles.btnSecondary}>Посмотреть каталог</Link>
@@ -247,14 +290,18 @@ export default function MainPage() {
             <div className={styles.section}>
               <h2>Работы на проверке</h2>
               <div className={styles.attemptsList}>
-                {pendingAttempts.slice(0, 5).map((a: any) => (
-                  <div key={a.pkIdAttempt} className={styles.attemptRow}>
+                {pendingAttempts.slice(0, 8).map((a: any) => (
+                  <Link
+                    key={a.pkIdAttempt}
+                    href={a.fkIdCourse ? `/courses/${a.fkIdCourse}/manage` : '/main'}
+                    className={styles.attemptRow}
+                  >
                     <div className={styles.attemptInfo}>
                       <strong>{a.listenerName}</strong>
                       <span>{a.taskTitle}</span>
                     </div>
-                    <span className={styles.pendingBadge}>На проверке</span>
-                  </div>
+                    <span className={styles.pendingBadge}>На проверке →</span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -270,18 +317,17 @@ export default function MainPage() {
       <div className={styles.welcomeBar}>
         <div>
           <h1>Добро пожаловать, {user?.fullName?.split(' ')[1] || user?.fullName}!</h1>
-          <p>Слушатель · {myEnrollments.length} курсов</p>
+          <p>Ваши программы · {myEnrollments.length} курсов</p>
         </div>
         {unreadNotifications > 0 && (
           <Link href="/notifications" className={styles.alertBadge}>
-            🔔 {unreadNotifications} уведомлений
+            {unreadNotifications} уведомлений
           </Link>
         )}
       </div>
 
       {myEnrollments.length === 0 ? (
         <div className={styles.emptyState}>
-          <span>🎓</span>
           <h3>Вы пока не записаны на курсы</h3>
           <p>Найдите интересный курс и запишитесь</p>
           <Link href="/courses" className={styles.btnPrimary}>Перейти в каталог</Link>
@@ -296,16 +342,24 @@ export default function MainPage() {
             {myEnrollments.map(({ group, course }) => {
               const courseAttempts = myAttempts.filter((a: any) => a.fkIdCourse === course.pkIdCourse);
               const accepted = courseAttempts.filter((a: any) => a.statusName === 'Принято').length;
+              const pct = courseProgressPct[course.pkIdCourse] ?? 0;
               return (
                 <Link key={group.pkIdGroup} href={`/courses/${course.pkIdCourse}`} className={styles.enrollmentCard}>
+                  <div
+                    className={styles.progressRing}
+                    style={{ '--pct': pct } as React.CSSProperties}
+                    aria-hidden
+                  >
+                    <span className={styles.progressRingValue}>{pct}%</span>
+                  </div>
                   <div className={styles.enrollmentTop}>
                     <span className={styles.groupBadge}>{group.name || (group as any).groupName}</span>
                   </div>
                   <h3>{course.title}</h3>
                   <p>{course.description?.slice(0, 80)}{course.description?.length > 80 ? '...' : ''}</p>
                   <div className={styles.enrollmentMeta}>
-                    <span>👨‍🏫 {group.curatorName || 'Куратор не назначен'}</span>
-                    {accepted > 0 && <span>✅ {accepted} принято</span>}
+                    <span>Куратор: {group.curatorName || '—'}</span>
+                    {accepted > 0 && <span>{accepted} заданий принято</span>}
                   </div>
                   <div className={styles.enrollmentDates}>
                     до {course.endDate && new Date(course.endDate).toLocaleDateString('ru-RU')}
@@ -321,19 +375,19 @@ export default function MainPage() {
         <h2>Быстрые действия</h2>
         <div className={styles.actionsGrid}>
           <Link href="/courses" className={styles.actionCard}>
-            <span className={styles.actionIcon}>📚</span>
+            <span className={styles.actionIcon}>К</span>
             <div><div className={styles.actionLabel}>Каталог курсов</div><div className={styles.actionDesc}>Найти новый курс</div></div>
           </Link>
           <Link href="/certificates" className={styles.actionCard}>
-            <span className={styles.actionIcon}>🎓</span>
+            <span className={styles.actionIcon}>С</span>
             <div><div className={styles.actionLabel}>Сертификаты</div><div className={styles.actionDesc}>Мои достижения</div></div>
           </Link>
           <Link href="/messages" className={styles.actionCard}>
-            <span className={styles.actionIcon}>💬</span>
+            <span className={styles.actionIcon}>М</span>
             <div><div className={styles.actionLabel}>Сообщения</div><div className={styles.actionDesc}>Связь с преподавателем</div></div>
           </Link>
           <Link href="/account" className={styles.actionCard}>
-            <span className={styles.actionIcon}>👤</span>
+            <span className={styles.actionIcon}>П</span>
             <div><div className={styles.actionLabel}>Профиль</div><div className={styles.actionDesc}>Мои данные</div></div>
           </Link>
         </div>

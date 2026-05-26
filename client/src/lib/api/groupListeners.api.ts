@@ -2,6 +2,10 @@ import apiClient from './apiClient';
 
 export interface IGroupListener {
   pkIdGroupListener: number;
+  fkIdGroup?: number;
+  /** Дублируется из JOIN — удобно для UI без запроса всех групп */
+  fkIdCourse?: number;
+  fkIdListener?: number;
   groupName: string;
   courseTitle: string;
   listenerName: string;

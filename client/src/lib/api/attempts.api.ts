@@ -2,6 +2,10 @@ import apiClient from './apiClient';
 
 export interface IAttempt {
   pkIdAttempt: number;
+  fkIdTask?: number | null;
+  fkIdListener?: number | null;
+  fkIdLesson?: number | null;
+  fkIdCourse?: number | null;
   taskTitle: string;
   listenerName: string;
   statusName: string;
@@ -20,8 +24,8 @@ export interface ICreateAttemptDto {
 }
 
 export interface IGradeAttemptDto {
-  score: number;
-  statusId?: number;
+  score?: number;
+  statusId: number;
 }
 
 export const attemptsApi = {
@@ -45,6 +49,11 @@ export const attemptsApi = {
     return response.data;
   },
 
+  getByCourse: async (courseId: number): Promise<IAttempt[]> => {
+    const response = await apiClient.get(`/attempts/course/${courseId}`);
+    return response.data;
+  },
+
   getById: async (id: number): Promise<IAttempt> => {
     const response = await apiClient.get(`/attempts/${id}`);
     return response.data;
@@ -57,6 +66,14 @@ export const attemptsApi = {
 
   grade: async (id: number, dto: IGradeAttemptDto): Promise<IAttempt> => {
     const response = await apiClient.put(`/attempts/${id}/grade`, dto);
+    return response.data;
+  },
+
+  resubmit: async (
+    id: number,
+    dto: { answerText?: string; answerFileUrl?: string },
+  ): Promise<IAttempt> => {
+    const response = await apiClient.put(`/attempts/${id}/resubmit`, dto);
     return response.data;
   },
 

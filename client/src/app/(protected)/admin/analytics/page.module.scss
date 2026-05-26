@@ -31,11 +31,19 @@ $dark: #0f172a;
 
 .pageHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1.6rem;
 
-  h1 { font-size: 2.4rem; font-weight: 700; color: $dark; }
+  h1 { font-size: 2.4rem; font-weight: 700; color: $dark; margin: 0; }
+}
+
+.pageLead {
+  margin: 0.8rem 0 0;
+  font-size: 1.35rem;
+  color: $muted;
+  line-height: 1.45;
+  max-width: 62rem;
 }
 
 .courseFilter {
@@ -46,6 +54,8 @@ $dark: #0f172a;
   outline: none;
   background: #fff;
   min-width: 24rem;
+  flex-shrink: 0;
+  margin-left: auto;
 
   &:focus { border-color: $blue; }
 }
@@ -68,6 +78,7 @@ $dark: #0f172a;
 
   &.blue   { border-top-color: $blue; }
   &.green  { border-top-color: #16a34a; }
+  &.teal   { border-top-color: #0d9488; }
   &.purple { border-top-color: #7c3aed; }
   &.orange { border-top-color: #ea580c; }
   &.yellow { border-top-color: #ca8a04; }
@@ -166,3 +177,13 @@ $dark: #0f172a;
 
 .attemptValue { font-size: 3.2rem; font-weight: 700; color: $dark; }
 .attemptLabel { font-size: 1.4rem; color: $muted; }
+
+.chartWrap {
+  width: 100%;
+  min-height: 28rem;
+  padding: 1.6rem;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 1.2rem;
+  overflow-x: auto;
+}

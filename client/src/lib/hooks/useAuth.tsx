@@ -9,9 +9,12 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { ToastContainer } from 'react-toastify';
 import { authApi } from '@/lib/api/auth.api';
 import { apiClient } from '@/lib/api/apiClient';
+import { NotificationToastPoller } from '@/components/NotificationToastPoller';
 import type { IUser } from '@/lib/types';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface AuthContextType {
   user: IUser | null;
@@ -37,18 +40,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<IUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  // Используем ref чтобы избежать повторных вызовов в StrictMode
   const initialized = useRef(false);
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-
-    authApi.me()
-      .then((userData) => setUser(userData))
-      .catch(() => setUser(null))
-      .finally(() => setIsLoading(false));
+    initAuth();
   }, []);
+
+  const initAuth = async () => {
+    try {
+      const userData = await authApi.me();
+      setUser(userData);
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        try {
+          await apiClient.post('/auth/refresh');
+          const userData = await authApi.me();
+          setUser(userData);
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (loginValue: string, password: string) => {
     await authApi.login(loginValue, password);
@@ -90,6 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       checkRole, setUser,
     }}>
       {children}
+      <NotificationToastPoller />
+      <ToastContainer
+        position="top-right"
+        autoClose={8000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="colored"
+        limit={4}
+      />
     </AuthContext.Provider>
   );
 }

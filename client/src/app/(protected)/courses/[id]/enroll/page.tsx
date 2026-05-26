@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { coursesApi } from '@/lib/api/courses.api';
@@ -8,17 +8,17 @@ import { groupsApi } from '@/lib/api/groups.api';
 import { groupListenersApi } from '@/lib/api/groupListeners.api';
 import { courseTeachersApi } from '@/lib/api/courseTeachers.api';
 import type { ICourse, IGroup } from '@/lib/types';
-import { COURSE_STATUS } from '@/lib/constants';
+import { isPublishedCourse } from '@/lib/constants';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import styles from './page.module.scss';
 
-const GROUP_MAX_SIZE = 25; // максимум слушателей в группе
+const GROUP_MAX_SIZE = 25;
 
 export default function EnrollPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const courseId = Number(params.id);
-  const initialized = useRef(false);
 
   const [course, setCourse] = useState<ICourse | null>(null);
   const [groups, setGroups] = useState<IGroup[]>([]);
@@ -30,10 +30,8 @@ export default function EnrollPage() {
   const [enrolledGroup, setEnrolledGroup] = useState<IGroup | null>(null);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [courseId, user]);
 
   const loadData = async () => {
     try {
@@ -43,7 +41,7 @@ export default function EnrollPage() {
         courseTeachersApi.getByCourse(courseId),
       ]);
 
-      if (courseData.fkIdStatus !== COURSE_STATUS.PUBLISHED) {
+      if (!isPublishedCourse(courseData)) {
         setError('Этот курс недоступен для записи');
         setLoading(false);
         return;
@@ -52,7 +50,6 @@ export default function EnrollPage() {
       setCourse(courseData);
       setTeachers(teachersData);
 
-      // Проверяем не записан ли уже
       if (user) {
         const enrollments = await groupListenersApi.getByListener(user.pkIdUser);
         const groupIds = new Set(groupsData.map((g) => g.pkIdGroup));
@@ -74,23 +71,19 @@ export default function EnrollPage() {
     }
   };
 
-  // Автоматически находим или создаём группу
   const handleEnroll = async () => {
     if (!user || !course) return;
     setSubmitting(true);
     setError('');
 
     try {
-      // Ищем группу с местом
       const availableGroup = groups.find((g) => (g.listenerCount || 0) < GROUP_MAX_SIZE);
 
       let targetGroupId: number;
 
       if (availableGroup) {
-        // Есть место в существующей группе
         targetGroupId = availableGroup.pkIdGroup;
       } else {
-        // Создаём новую группу автоматически
         const groupNumber = groups.length + 1;
         const newGroup = await groupsApi.create({
           name: `${course.title.slice(0, 20)} — Группа ${groupNumber}`,
@@ -102,8 +95,8 @@ export default function EnrollPage() {
 
       await groupListenersApi.create({ groupId: targetGroupId, listenerId: user.pkIdUser });
       router.push(`/courses/${courseId}?enrolled=1`);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка записи на курс');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ошибка записи на курс'));
     } finally {
       setSubmitting(false);
     }
@@ -113,15 +106,13 @@ export default function EnrollPage() {
 
   if (error && !course) return (
     <div className={styles.errorPage}>
-      <span>⚠️</span>
       <p>{error}</p>
-      <button onClick={() => router.push('/courses')} className={styles.btnBack}>← К каталогу</button>
+      <button type="button" onClick={() => router.push('/courses')} className={styles.btnBack}>← К каталогу</button>
     </div>
   );
 
   if (alreadyEnrolled) return (
     <div className={styles.alreadyPage}>
-      <span>✅</span>
       <h2>Вы уже записаны на этот курс</h2>
       <p className={styles.courseName}>{course?.title}</p>
       {enrolledGroup && (
@@ -129,77 +120,39 @@ export default function EnrollPage() {
           Ваша группа: <strong>{enrolledGroup.name || (enrolledGroup as any).groupName}</strong>
         </p>
       )}
-      <button onClick={() => router.push(`/courses/${courseId}`)} className={styles.btnPrimary}>
+      <button type="button" onClick={() => router.push(`/courses/${courseId}`)} className={styles.btnPrimary}>
         Перейти к курсу →
       </button>
     </div>
   );
 
-  // Считаем доступные места
-  const totalSlots = groups.length * GROUP_MAX_SIZE;
-  const takenSlots = groups.reduce((s, g) => s + (g.listenerCount || 0), 0);
-  const freeSlots = groups.length > 0 ? totalSlots - takenSlots : 'неограничено';
-  const hasAvailableGroup = groups.some((g) => (g.listenerCount || 0) < GROUP_MAX_SIZE);
-
   return (
     <div className={styles.container}>
-      <button onClick={() => router.back()} className={styles.backBtn}>← Назад</button>
+      <button type="button" onClick={() => router.back()} className={styles.backBtn}>← Назад</button>
 
       <div className={styles.coursePreview}>
         <div className={styles.coursePreviewBadge}>Запись на курс</div>
         <h1>{course?.title}</h1>
         <p>{course?.description}</p>
         <div className={styles.courseMeta}>
-          {course?.startDate && <span>📅 {new Date(course.startDate).toLocaleDateString('ru-RU')}</span>}
-          {course?.endDate && <span>🏁 до {new Date(course.endDate).toLocaleDateString('ru-RU')}</span>}
-          {teachers.length > 0 && <span>👨‍🏫 {teachers.map((t) => t.teacherName).join(', ')}</span>}
+          {course?.startDate && <span>Начало: {new Date(course.startDate).toLocaleDateString('ru-RU')}</span>}
+          {course?.endDate && <span>Окончание: {new Date(course.endDate).toLocaleDateString('ru-RU')}</span>}
+          {teachers.length > 0 && <span>Преподаватели: {teachers.map((t) => t.teacherName).join(', ')}</span>}
         </div>
       </div>
 
       <div className={styles.enrollSection}>
         <h2>Запись на курс</h2>
 
-        <div className={styles.infoCards}>
-          <div className={styles.infoCard}>
-            <span className={styles.infoIcon}>🏫</span>
-            <div>
-              <strong>{groups.length > 0 ? groups.length : 'Авто'}</strong>
-              <span>групп</span>
-            </div>
-          </div>
-          <div className={styles.infoCard}>
-            <span className={styles.infoIcon}>👥</span>
-            <div>
-              <strong>{freeSlots}</strong>
-              <span>свободных мест</span>
-            </div>
-          </div>
-          <div className={styles.infoCard}>
-            <span className={styles.infoIcon}>📏</span>
-            <div>
-              <strong>{GROUP_MAX_SIZE}</strong>
-              <span>чел. в группе</span>
-            </div>
-          </div>
-        </div>
-
         <div className={styles.enrollInfo}>
-          <p>
-            После записи вы будете автоматически распределены в учебную группу.
-            Куратор группы будет назначен администратором.
-          </p>
-          {groups.length > 0 && !hasAvailableGroup && (
-            <div className={styles.warningMsg}>
-              ⚠️ Все текущие группы заполнены. Будет создана новая группа.
-            </div>
-          )}
+          <p>После записи вы будете автоматически распределены в учебную группу.</p>
         </div>
 
         {error && <div className={styles.errorMsg}>{error}</div>}
 
         <div className={styles.actions}>
-          <button onClick={() => router.back()} className={styles.btnCancel}>Отмена</button>
-          <button onClick={handleEnroll} disabled={submitting} className={styles.btnPrimary}>
+          <button type="button" onClick={() => router.back()} className={styles.btnCancel}>Отмена</button>
+          <button type="button" onClick={handleEnroll} disabled={submitting} className={styles.btnPrimary}>
             {submitting ? 'Запись...' : 'Записаться на курс'}
           </button>
         </div>

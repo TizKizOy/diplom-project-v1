@@ -9,7 +9,8 @@ import {
   Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
+import { transformDeadlineToIso } from 'src/common/transformers/parse-deadline.transform';
 
 export class CreateTaskDto {
   @ApiProperty({
@@ -29,11 +30,12 @@ export class CreateTaskDto {
   @Type(() => Number)
   courseId: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'ID урока' })
+  @ApiPropertyOptional({ example: 1, description: 'ID урока (если не указано — задание уровня курса)' })
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  lessonId: number;
+  lessonId?: number;
 
   @ApiPropertyOptional({ example: 1, description: 'ID теста' })
   @IsOptional()
@@ -84,12 +86,13 @@ export class CreateTaskDto {
   contentFileUrl?: string;
 
   @ApiPropertyOptional({
-    example: '2025-09-15T23:59:59Z',
-    description: 'Дедлайн (ISO 8601)',
+    example: '2025-09-15T23:59:59.000Z',
+    description: 'Дедлайн (ISO 8601; допускаются datetime-local и DD.MM.YYYY HH:mm)',
   })
+  @Transform(transformDeadlineToIso)
   @IsOptional()
   @IsDateString()
-  deadline?: Date;
+  deadline?: string;
 
   @ApiPropertyOptional({
     example: 100,
@@ -97,7 +100,8 @@ export class CreateTaskDto {
     default: 100,
   })
   @IsInt()
-  @Min(1)
+  @Min(0)
+  @Max(10000)
   @IsOptional()
   @Type(() => Number)
   maxScore?: number;

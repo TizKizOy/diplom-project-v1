@@ -7,7 +7,7 @@ export interface ICreateCourseDto {
   startDate?: string;
   endDate?: string;
   statusId: number;
-  tags?: string;
+  tagIds?: number[];
 }
 
 export interface IUpdateCourseDto {
@@ -16,7 +16,12 @@ export interface IUpdateCourseDto {
   startDate?: string;
   endDate?: string;
   statusId?: number;
-  tags?: string;
+  tagIds?: number[];
+}
+
+export interface ICourseTag {
+  pkIdTag: number;
+  name: string;
 }
 
 export const coursesApi = {
@@ -32,6 +37,11 @@ export const coursesApi = {
 
   getByStatus: async (statusId: number): Promise<ICourse[]> => {
     const response = await apiClient.get(`/courses/status/${statusId}`);
+    return response.data;
+  },
+
+  getTagCatalog: async (): Promise<ICourseTag[]> => {
+    const response = await apiClient.get('/courses/meta/tags');
     return response.data;
   },
 

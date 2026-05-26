@@ -24,6 +24,7 @@ export interface ICourse {
   fkIdStatus: number;
   statusName: string;
   tags?: string;
+  tagIds?: number[];
 }
 
 export interface ILesson {
@@ -50,6 +51,7 @@ export interface ITask {
   typeId?: number;
   fkIdCourse?: number;
   fkIdLesson?: number;
+  fkIdTest?: number | null;
   title?: string;
   content?: string;
   contentFileUrl?: string;
@@ -58,24 +60,32 @@ export interface ITask {
 
 export interface IMaterial {
   pkIdMaterial: number;
-  fkIdCourse: number;
-  fkIdLesson: number;
-  fkIdTypeMaterial: number;
-  title: string;
+  fkIdCourse?: number;
+  fkIdLesson?: number;
+  fkIdTypeMaterial?: number;
+  /** Как приходит из API / prGetMaterialsWithTypesAndLessons (`m.title AS materialTitle`) */
+  materialTitle?: string;
+  /** Локальное имя при создании DTO; если с сервера только materialTitle — смотрите getMaterialTitle */
+  title?: string;
   description: string;
   fileUrl: string;
   link: string;
-  sortOrder: number;
-  isAdditional: boolean;
+  sortOrder?: number;
+  isAdditional?: boolean;
   typeName: string;
   lessonTitle: string;
   courseTitle: string;
 }
 
+export function getMaterialTitle(m: Pick<IMaterial, 'materialTitle' | 'title'>): string {
+  const s = m.materialTitle ?? m.title;
+  return s == null ? '' : String(s);
+}
+
 export interface IGroup {
   pkIdGroup: number;
   fkIdCourse: number;
-  fkIdCurator: number;
+  fkIdCurator?: number | null;
   name: string;
   groupName?: string; // API может возвращать groupName вместо name
   courseTitle: string;
@@ -87,6 +97,7 @@ export interface IGroupListener {
   pkIdGroupListener: number;
   fkIdGroup: number;
   fkIdListener: number;
+  fkIdCourse?: number;
   groupName: string;
   courseTitle: string;
   listenerName: string;

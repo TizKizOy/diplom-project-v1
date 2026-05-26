@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GroupsService } from './groups.service';
@@ -25,6 +26,10 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { GroupListenersService } from 'src/group-listeners/group-listeners.service';
 import { IGroupListener } from 'src/group-listeners/interfaces/group-listener.interface';
+import { CoursesService } from 'src/courses/courses.service';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
+
+const COURSE_PUBLISHED_STATUS_ID = 2;
 
 @ApiTags('Groups')
 @ApiBearerAuth()
@@ -34,6 +39,7 @@ export class GroupsController {
   constructor(
     private readonly groupsService: GroupsService,
     private readonly groupListenersService: GroupListenersService,
+    private readonly coursesService: CoursesService,
   ) {}
 
   @Get()
@@ -73,13 +79,24 @@ export class GroupsController {
   }
 
   @Post()
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Создать группу' })
   async create(
     @Body() body: CreateGroupDto,
-    @CurrentUser('pkIdUser') adminId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IGroup> {
-    return await this.groupsService.create(body, adminId);
+    if (user.roleName === Role.LISTENER) {
+      const course = await this.coursesService.getById(body.courseId);
+      const published =
+        course.fkIdStatus === COURSE_PUBLISHED_STATUS_ID ||
+        course.statusName === 'Опубликован';
+      if (!published) {
+        throw new ForbiddenException(
+          'Создание группы слушателем доступно только для опубликованного курса',
+        );
+      }
+    }
+    return await this.groupsService.create(body, user.pkIdUser);
   }
 
   @Put(':id')

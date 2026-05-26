@@ -14,6 +14,18 @@ GO
 USE dbDiplom;
 GO
 
+/*
+  ОСНОВНОЙ СКРИПТ БД (единственный источник правды для развёртывания).
+  Создаёт БД dbDiplom, таблицы, процедуры и тестовые данные.
+
+  Важно для NestJS / Next.js-клиента (актуальные поля в SELECT):
+  - prGetAttemptsWithUsersAndStatus — fkIdTask, fkIdListener, fkIdLesson, fkIdCourse (= COALESCE(t.fkIdCourse, l.fkIdCourse)), answerText, answerFileUrl
+  - prGetTasksWithTypesAndLessons — fkIdCourse, fkIdLesson, typeId (fkIdTypeTasks), fkIdTest, sortOrder
+  - prGetGroupListenersWithUserInfo — fkIdGroup, fkIdListener, fkIdCourse
+
+  На уже существующей БД достаточно выполнить только изменённые CREATE OR ALTER PROCEDURE из этого файла.
+*/
+
 --#region ===== СПРАВОЧНИКИ =====
 -- Таблицы без внешних ключей
 IF EXISTS (SELECT * FROM dbo.sysobjects WHERE id = OBJECT_ID('tbPositions')) DROP TABLE tbPositions;
@@ -928,6 +940,7 @@ INSERT INTO tbAdminLog (fkIdAdminUser, tableName, action, oldData, newData) VALU
 --#endregion
 
 PRINT 'База данных успешно заполнена тестовыми данными!';
+PRINT 'Для расширенного демо-наполнения выполните также SeedExtendedData.sql в этой же БД.';
 GO
 
 --#region ===== ПРЕДСТАВЛЕНИЯ =====
@@ -1149,7 +1162,7 @@ go
 		CREATE OR ALTER PROCEDURE prGetCoursesWithStatusAndTags
 			@pkIdCourse INT = NULL, @fkIdStatus INT = NULL, @title NVARCHAR(255) = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT c.pkIdCourse, c.title, c.description, c.startDate, c.endDate, sc.name AS statusName,
+			SELECT c.pkIdCourse, c.fkIdStatus, c.title, c.description, c.startDate, c.endDate, sc.name AS statusName,
 				STRING_AGG(t.name, ', ') AS tags
 			FROM tbCourses c
 			LEFT JOIN tbStatusCourses sc ON c.fkIdStatus = sc.pkIdStatusCourse
@@ -1159,7 +1172,7 @@ go
 				AND (@pkIdCourse IS NULL OR c.pkIdCourse = @pkIdCourse)
 				AND (@fkIdStatus IS NULL OR c.fkIdStatus = @fkIdStatus)
 				AND (@title IS NULL OR c.title LIKE '%' + @title + '%')
-			GROUP BY c.pkIdCourse, c.title, c.description, c.startDate, c.endDate, sc.name
+			GROUP BY c.pkIdCourse, c.fkIdStatus, c.title, c.description, c.startDate, c.endDate, sc.name
 		END
 		GO
 
@@ -1173,6 +1186,12 @@ go
 				IF EXISTS (SELECT 1 FROM tbCourses WHERE title = @title AND isDeleted = 0)
 				BEGIN
 					RAISERROR('Курс с названием "%s" уже существует', 16, 1, @title);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
+				IF @startDate IS NOT NULL AND @endDate IS NOT NULL AND @endDate < @startDate
+				BEGIN
+					RAISERROR(N'Дата окончания курса не может быть раньше даты начала', 16, 1);
 					ROLLBACK TRANSACTION;
 					RETURN;
 				END
@@ -1202,6 +1221,16 @@ go
 				 IF @title IS NOT NULL AND EXISTS (SELECT 1 FROM tbCourses WHERE title = @title AND pkIdCourse != @pkIdCourse AND isDeleted = 0)
 				BEGIN
 					RAISERROR('Курс с названием "%s" уже существует', 16, 1, @title);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
+				DECLARE @curStart DATETIME2, @curEnd DATETIME2;
+				SELECT @curStart = startDate, @curEnd = endDate FROM tbCourses WHERE pkIdCourse = @pkIdCourse AND isDeleted = 0;
+				DECLARE @newStart DATETIME2 = ISNULL(@startDate, @curStart);
+				DECLARE @newEnd DATETIME2 = ISNULL(@endDate, @curEnd);
+				IF @newStart IS NOT NULL AND @newEnd IS NOT NULL AND @newEnd < @newStart
+				BEGIN
+					RAISERROR(N'Дата окончания курса не может быть раньше даты начала', 16, 1);
 					ROLLBACK TRANSACTION;
 					RETURN;
 				END
@@ -1333,7 +1362,7 @@ go
 		CREATE OR ALTER PROCEDURE prGetCourseTeachers
 			@pkIdCourseTeacher INT = NULL, @fkIdCourse INT = NULL, @fkIdTeacher INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT ct.pkIdCourseTeacher, ct.assignedAt, c.title AS courseTitle, u.fullName AS teacherName
+			SELECT ct.pkIdCourseTeacher, ct.fkIdCourse, ct.fkIdTeacher, ct.assignedAt, c.title AS courseTitle, u.fullName AS teacherName
 			FROM tbCourseTeacher ct
 			LEFT JOIN tbCourses c ON ct.fkIdCourse = c.pkIdCourse
 			LEFT JOIN tbUsers u ON ct.fkIdTeacher = u.pkIdUser
@@ -1470,7 +1499,7 @@ go
 		CREATE OR ALTER PROCEDURE prGetGroupsWithCuratorsAndCourses
 			@pkIdGroup INT = NULL, @fkIdCourse INT = NULL, @fkIdCurator INT = NULL, @groupName NVARCHAR(100) = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT g.pkIdGroup, g.name AS groupName, c.title AS courseTitle, u.fullName AS curatorName,
+			SELECT g.pkIdGroup, g.fkIdCourse, g.fkIdCurator, g.name AS groupName, c.title AS courseTitle, u.fullName AS curatorName,
 				COUNT(gl.fkIdListener) AS listenerCount
 			FROM tbGroup g
 			LEFT JOIN tbCourses c ON g.fkIdCourse = c.pkIdCourse
@@ -1481,7 +1510,7 @@ go
 				AND (@fkIdCourse IS NULL OR g.fkIdCourse = @fkIdCourse)
 				AND (@fkIdCurator IS NULL OR g.fkIdCurator = @fkIdCurator)
 				AND (@groupName IS NULL OR g.name LIKE '%' + @groupName + '%')
-			GROUP BY g.pkIdGroup, g.name, c.title, u.fullName
+			GROUP BY g.pkIdGroup, g.fkIdCourse, g.fkIdCurator, g.name, c.title, u.fullName
 		END
 		GO
 
@@ -1639,7 +1668,8 @@ go
 		CREATE OR ALTER PROCEDURE prGetGroupListenersWithUserInfo
 			@pkIdGroupListener INT = NULL, @fkIdGroup INT = NULL, @fkIdListener INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT gl.pkIdGroupListener, g.name AS groupName, c.title AS courseTitle, u.fullName as listenerName, u.email, u.phone
+			SET NOCOUNT ON;
+			SELECT gl.pkIdGroupListener, gl.fkIdGroup, gl.fkIdListener, g.fkIdCourse, g.name AS groupName, c.title AS courseTitle, u.fullName as listenerName, u.email, u.phone
 			FROM tbGroupListener gl
 			JOIN tbGroup g ON gl.fkIdGroup = g.pkIdGroup
 			JOIN tbUsers u ON gl.fkIdListener = u.pkIdUser
@@ -1945,7 +1975,9 @@ go
 		CREATE OR ALTER PROCEDURE prGetTasksWithTypesAndLessons
 			@pkIdTask INT = NULL, @fkIdTypeTasks INT = NULL, @fkIdCourse INT = NULL, @fkIdLesson INT = NULL, @taskTitle NVARCHAR(255) = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT t.pkIdTask, t.title AS taskTitle, t.description, t.deadline, t.maxScore,
+			SET NOCOUNT ON;
+			SELECT t.pkIdTask, t.fkIdCourse, t.fkIdLesson, t.fkIdTypeTasks AS typeId, t.fkIdTest, t.sortOrder,
+				t.title AS taskTitle, t.description, t.deadline, t.maxScore,
 				tt.name AS taskTypeName, l.title AS lessonTitle, c.title AS courseTitle
 			FROM tbTasks t
 			LEFT JOIN tbTypeTasks tt ON t.fkIdTypeTasks = tt.pkIdTypeTask
@@ -1986,6 +2018,18 @@ go
 						RETURN;
 					END
 				END
+				IF @deadline IS NOT NULL AND @deadline <= SYSUTCDATETIME()
+				BEGIN
+					RAISERROR(N'Дедлайн задания должен быть в будущем', 16, 1);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
+				IF @maxScore IS NOT NULL AND (@maxScore < 0 OR @maxScore > 10000)
+				BEGIN
+					RAISERROR(N'Максимальный балл задания должен быть от 0 до 10000', 16, 1);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
 				INSERT INTO tbTasks (fkIdTypeTasks, fkIdCourse, fkIdLesson, fkIdTest, title, description, content, contentFileUrl, deadline, maxScore, sortOrder)
 				VALUES (@fkIdTypeTasks, @fkIdCourse, @fkIdLesson, @fkIdTest, @title, @description, @content, @contentFileUrl, @deadline, @maxScore, @sortOrder);
 				DECLARE @newTaskId INT = SCOPE_IDENTITY();
@@ -2012,7 +2056,7 @@ go
 				BEGIN TRANSACTION;
 				IF @fkIdLesson IS NOT NULL
 				BEGIN
-					IF EXISTS (SELECT 1 FROM tbTasks  WHERE title = @title AND fkIdLesson = @fkIdLesson AND isDeleted = 0)
+					IF EXISTS (SELECT 1 FROM tbTasks  WHERE title = @title AND fkIdLesson = @fkIdLesson AND isDeleted = 0 AND pkIdTask <> @pkIdTask)
 					BEGIN
 						RAISERROR('Задача с названием "%s" уже существует в данном уроке', 16, 1, @title);
 						ROLLBACK TRANSACTION;
@@ -2021,12 +2065,28 @@ go
 				END
 				ELSE
 				BEGIN
-					IF EXISTS (SELECT 1 FROM tbTasks WHERE title = @title AND fkIdCourse = @fkIdCourse AND fkIdLesson IS NULL AND isDeleted = 0)
+					IF EXISTS (SELECT 1 FROM tbTasks WHERE title = @title AND fkIdCourse = @fkIdCourse AND fkIdLesson IS NULL AND isDeleted = 0 AND pkIdTask <> @pkIdTask)
 					BEGIN
 						RAISERROR('Задача с названием "%s" уже существует в данном курсе', 16, 1, @title);
 						ROLLBACK TRANSACTION;
 						RETURN;
 					END
+				END
+				DECLARE @oldDeadlineUpd DATETIME2;
+				SELECT @oldDeadlineUpd = deadline FROM tbTasks WHERE pkIdTask = @pkIdTask AND isDeleted = 0;
+				IF @deadline IS NOT NULL
+					AND @deadline <= SYSUTCDATETIME()
+					AND (@oldDeadlineUpd IS NULL OR @deadline <> @oldDeadlineUpd)
+				BEGIN
+					RAISERROR(N'Дедлайн задания должен быть в будущем', 16, 1);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
+				IF @maxScore IS NOT NULL AND (@maxScore < 0 OR @maxScore > 10000)
+				BEGIN
+					RAISERROR(N'Максимальный балл задания должен быть от 0 до 10000', 16, 1);
+					ROLLBACK TRANSACTION;
+					RETURN;
 				END
 				UPDATE tbTasks
 				SET fkIdTypeTasks = ISNULL(@fkIdTypeTasks, fkIdTypeTasks), fkIdCourse = ISNULL(@fkIdCourse, fkIdCourse),
@@ -2148,7 +2208,8 @@ go
 		CREATE OR ALTER PROCEDURE prGetMaterialsWithTypesAndLessons
 			@pkIdMaterial INT = NULL, @fkIdCourse INT = NULL, @fkIdLesson INT = NULL, @fkIdTypeMaterial INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT m.pkIdMaterial, m.title AS materialTitle, m.description, m.fileUrl, m.link,
+			SELECT m.pkIdMaterial, m.fkIdCourse, m.fkIdLesson, m.fkIdTypeMaterial, m.sortOrder, m.isAdditional,
+				m.title AS materialTitle, m.description, m.fileUrl, m.link,
 				tm.name AS typeName, l.title AS lessonTitle, c.title AS courseTitle
 			FROM tbMaterial m
 			LEFT JOIN tbTypeMaterials tm ON m.fkIdTypeMaterial = tm.pkIdTypeMaterial
@@ -2371,12 +2432,16 @@ go
 
 	--#region ===== ATTEMPT =====
 		CREATE OR ALTER PROCEDURE prGetAttemptsWithUsersAndStatus
-			@pkIdAttempt INT = NULL, @fkIdTask INT = NULL, @fkIdListener INT = NULL, @fkIdStatusAttempt INT = NULL, @isDeleted BIT = 0
+			@pkIdAttempt INT = NULL, @fkIdTask INT = NULL, @fkIdListener INT = NULL, @fkIdStatusAttempt INT = NULL, @isDeleted BIT = 0, @fkIdCourse INT = NULL
 		AS BEGIN
-			SELECT a.pkIdAttempt, t.title AS taskTitle, u.fullName AS listenerName,
-				 sa.name AS statusName, a.submittedAt, a.score
+			SET NOCOUNT ON;
+			SELECT a.pkIdAttempt, a.fkIdTask, a.fkIdListener, t.fkIdLesson,
+				COALESCE(t.fkIdCourse, l.fkIdCourse) AS fkIdCourse,
+				t.title AS taskTitle, u.fullName AS listenerName,
+				 sa.name AS statusName, a.submittedAt, a.score, a.answerText, a.answerFileUrl
 			FROM tbAttempt a
 			LEFT JOIN tbTasks t ON a.fkIdTask = t.pkIdTask
+			LEFT JOIN tbLessons l ON t.fkIdLesson = l.pkIdLesson
 			LEFT JOIN tbUsers u ON a.fkIdListener = u.pkIdUser
 			LEFT JOIN tbStatusAttempt sa ON a.fkIdStatusAttempt = sa.pkIdStatusAttempt
 			WHERE a.isDeleted = @isDeleted
@@ -2384,6 +2449,7 @@ go
 				AND (@fkIdTask IS NULL OR a.fkIdTask = @fkIdTask)
 				AND (@fkIdListener IS NULL OR a.fkIdListener = @fkIdListener)
 				AND (@fkIdStatusAttempt IS NULL OR a.fkIdStatusAttempt = @fkIdStatusAttempt)
+				AND (@fkIdCourse IS NULL OR COALESCE(t.fkIdCourse, l.fkIdCourse) = @fkIdCourse)
 		END
 		GO
 
@@ -2395,7 +2461,7 @@ go
 			BEGIN TRY
 				BEGIN TRANSACTION;
 				IF EXISTS (SELECT 1 FROM tbAttempt WHERE fkIdTask = @fkIdTask AND fkIdListener = @fkIdListener 
-					AND isDeleted = 0AND fkIdStatusAttempt IN (1, 2))
+					AND isDeleted = 0 AND fkIdStatusAttempt IN (1, 2))
 				BEGIN
 					RAISERROR('У слушателя уже есть активная попытка по этой задаче. Завершите или удалите её перед созданием новой', 16, 1);
 					ROLLBACK TRANSACTION;
@@ -2444,27 +2510,31 @@ go
 					RETURN;
 				END
 
-				IF @currentStatus IN (3, 4) AND (@answerText IS NOT NULL OR @answerFileUrl IS NOT NULL)
+				IF @currentStatus = 3 AND (@answerText IS NOT NULL OR @answerFileUrl IS NOT NULL)
 				BEGIN
 					RAISERROR('Нельзя изменить ответ в завершённой попытке', 16, 1);
 					ROLLBACK TRANSACTION;
 					RETURN;
 				END
 
+				IF @currentStatus = 4 AND (@answerText IS NOT NULL OR @answerFileUrl IS NOT NULL)
+				BEGIN
+					SET @fkIdStatusAttempt = 1;
+				END
+
 				IF @score IS NOT NULL
 				BEGIN
-					IF @score < 0 OR @score > 100
+					IF @score < 0
 					BEGIN
-						RAISERROR('Оценка должна быть в диапазоне 0-100', 16, 1);
+						RAISERROR(N'Оценка не может быть отрицательной', 16, 1);
 						ROLLBACK TRANSACTION;
 						RETURN;
 					END
-            
-					IF @fkIdStatusAttempt IS NULL
-						SET @fkIdStatusAttempt = 4;
-					ELSE IF @fkIdStatusAttempt NOT IN (3, 4) 
+					DECLARE @maxTaskScore INT;
+					SELECT @maxTaskScore = maxScore FROM tbTasks WHERE pkIdTask = @taskId AND isDeleted = 0;
+					IF @maxTaskScore IS NOT NULL AND @score > @maxTaskScore
 					BEGIN
-						RAISERROR('При выставлении оценки статус должен быть "Отклонено" или "На доработке"', 16, 1);
+						RAISERROR(N'Оценка должна быть от 0 до %d (максимум задания)', 16, 1, @maxTaskScore);
 						ROLLBACK TRANSACTION;
 						RETURN;
 					END
@@ -2606,7 +2676,7 @@ go
 		CREATE OR ALTER PROCEDURE prGetTestQuestionsWithOptions
 			@pkIdQuestion INT = NULL, @fkIdTest INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT tq.pkIdQuestion, tq.questionText, tq.score, tq.sortOrder AS questionSortOrder,
+			SELECT tq.pkIdQuestion, tq.fkIdTest, tq.questionText, tq.score, tq.sortOrder AS questionSortOrder,
 				   tto.pkIdOption, tto.optionText, tto.isCorrect, tto.sortOrder AS optionSortOrder
 			FROM tbTestQuestions tq
 			LEFT JOIN tbTestOptions tto ON tq.pkIdQuestion = tto.fkIdQuestion
@@ -2687,7 +2757,7 @@ go
 				RETURN;
 			END
 
-			IF EXISTS (SELECT 1 FROM tbTestQuestions WHERE fkIdTest = @targetTest AND questionText = @targetText AND isDeleted = 0AND pkIdQuestion != @pkIdQuestion)
+			IF EXISTS (SELECT 1 FROM tbTestQuestions WHERE fkIdTest = @targetTest AND questionText = @targetText AND isDeleted = 0 AND pkIdQuestion != @pkIdQuestion)
 			BEGIN
 				RAISERROR('Вопрос с таким текстом уже существует в данном тесте', 16, 1);
 				RETURN;
@@ -3087,6 +3157,131 @@ go
 		END;
 		GO
 
+		CREATE OR ALTER PROCEDURE spTestAnswersBulkCreate
+			@fkIdAttempt INT,
+			@answersJson NVARCHAR(MAX)
+		AS
+		BEGIN
+			SET NOCOUNT ON;
+			DECLARE @insertedCount INT = 0;
+			DECLARE @lastId INT = 0;
+			DECLARE @questionId INT;
+			DECLARE @optionId INT;
+
+			BEGIN TRY
+				IF NOT EXISTS (SELECT 1 FROM tbAttempt WHERE pkIdAttempt = @fkIdAttempt AND isDeleted = 0)
+				BEGIN
+					RAISERROR('Попытка %d не найдена или удалена', 16, 1, @fkIdAttempt);
+					RETURN;
+				END
+
+				IF @answersJson IS NULL OR LTRIM(RTRIM(@answersJson)) = '' OR ISJSON(@answersJson) <> 1
+				BEGIN
+					RAISERROR('Некорректный JSON с ответами', 16, 1);
+					RETURN;
+				END
+
+				BEGIN TRANSACTION;
+
+				DECLARE answer_cursor CURSOR LOCAL FAST_FORWARD FOR
+					SELECT questionId, optionId
+					FROM OPENJSON(@answersJson)
+					WITH (
+						questionId INT '$.questionId',
+						optionId INT '$.optionId'
+					);
+
+				OPEN answer_cursor;
+				FETCH NEXT FROM answer_cursor INTO @questionId, @optionId;
+
+				WHILE @@FETCH_STATUS = 0
+				BEGIN
+					IF NOT EXISTS (SELECT 1 FROM tbTestQuestions WHERE pkIdQuestion = @questionId AND isDeleted = 0)
+					BEGIN
+						RAISERROR('Вопрос %d не найден или удален', 16, 1, @questionId);
+						ROLLBACK TRANSACTION;
+						CLOSE answer_cursor;
+						DEALLOCATE answer_cursor;
+						RETURN;
+					END
+
+					IF NOT EXISTS (SELECT 1 FROM tbTestOptions WHERE pkIdOption = @optionId AND isDeleted = 0)
+					BEGIN
+						RAISERROR('Вариант ответа %d не найден или удален', 16, 1, @optionId);
+						ROLLBACK TRANSACTION;
+						CLOSE answer_cursor;
+						DEALLOCATE answer_cursor;
+						RETURN;
+					END
+
+					IF NOT EXISTS (
+						SELECT 1
+						FROM tbAttempt a
+						JOIN tbTasks t ON a.fkIdTask = t.pkIdTask
+						JOIN tbTestQuestions tq ON t.fkIdTest = tq.fkIdTest
+						WHERE a.pkIdAttempt = @fkIdAttempt AND tq.pkIdQuestion = @questionId
+					)
+					BEGIN
+						RAISERROR('Вопрос %d не относится к тесту данной попытки', 16, 1, @questionId);
+						ROLLBACK TRANSACTION;
+						CLOSE answer_cursor;
+						DEALLOCATE answer_cursor;
+						RETURN;
+					END
+
+					IF NOT EXISTS (
+						SELECT 1 FROM tbTestOptions
+						WHERE pkIdOption = @optionId AND fkIdQuestion = @questionId
+					)
+					BEGIN
+						RAISERROR('Вариант ответа не принадлежит к данному вопросу', 16, 1);
+						ROLLBACK TRANSACTION;
+						CLOSE answer_cursor;
+						DEALLOCATE answer_cursor;
+						RETURN;
+					END
+
+					IF EXISTS (
+						SELECT 1 FROM tbTestAnswers
+						WHERE fkIdAttempt = @fkIdAttempt AND fkIdQuestion = @questionId AND isDeleted = 0
+					)
+					BEGIN
+						RAISERROR('На вопрос %d уже дан ответ в рамках этой попытки', 16, 1, @questionId);
+						ROLLBACK TRANSACTION;
+						CLOSE answer_cursor;
+						DEALLOCATE answer_cursor;
+						RETURN;
+					END
+
+					INSERT INTO tbTestAnswers (fkIdAttempt, fkIdQuestion, fkIdSelectedOption)
+					VALUES (@fkIdAttempt, @questionId, @optionId);
+					SET @lastId = SCOPE_IDENTITY();
+					SET @insertedCount = @insertedCount + 1;
+
+					FETCH NEXT FROM answer_cursor INTO @questionId, @optionId;
+				END
+
+				CLOSE answer_cursor;
+				DEALLOCATE answer_cursor;
+
+				COMMIT TRANSACTION;
+				SELECT @lastId AS lastId, @insertedCount AS insertedCount;
+			END TRY
+			BEGIN CATCH
+				IF CURSOR_STATUS('local', 'answer_cursor') >= 0
+				BEGIN
+					CLOSE answer_cursor;
+					DEALLOCATE answer_cursor;
+				END
+				IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+				DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+				DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
+				DECLARE @ErrorState INT = ERROR_STATE();
+				RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
+			END CATCH
+		END;
+		GO
+
 		CREATE OR ALTER PROCEDURE spTestAnswerUpdate
 			@pkIdTestAnswer INT, @fkIdAttempt INT = NULL, @fkIdQuestion INT = NULL, @fkIdSelectedOption INT = NULL
 		AS 
@@ -3342,7 +3537,7 @@ go
 					RETURN;
 				END
         
-				IF EXISTS (SELECT 1 FROM tbTestOptions WHERE fkIdQuestion = @targetQuestion AND optionText = @targetText  AND isDeleted = 0AND pkIdOption != @pkIdOption)
+				IF EXISTS (SELECT 1 FROM tbTestOptions WHERE fkIdQuestion = @targetQuestion AND optionText = @targetText  AND isDeleted = 0 AND pkIdOption != @pkIdOption)
 				BEGIN
 					RAISERROR('Вариант ответа с таким текстом уже существует для данного вопроса', 16, 1);
 					RETURN;
@@ -3667,7 +3862,7 @@ go
 		CREATE OR ALTER PROCEDURE prGetMessages
 			@pkIdMessage INT = NULL, @fkIdSender INT = NULL, @fkIdReceiver INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT m.pkIdMessage, m.message, m.isRead, m.createdAt, sender.fullName AS senderName, receiver.fullName AS receiverName
+			SELECT m.pkIdMessage, m.fkIdSender, m.fkIdReceiver, m.message, m.isRead, m.createdAt, sender.fullName AS senderName, receiver.fullName AS receiverName
 			FROM tbMessage m
 			LEFT JOIN tbUsers sender ON m.fkIdSender = sender.pkIdUser
 			LEFT JOIN tbUsers receiver ON m.fkIdReceiver = receiver.pkIdUser
@@ -3828,6 +4023,35 @@ go
 		END
 		GO
 
+		CREATE OR ALTER PROCEDURE spNotificationsCreate
+			@fkIdUser INT,
+			@message NVARCHAR(527)
+		AS
+		BEGIN
+			SET NOCOUNT ON;
+			BEGIN TRY
+				IF NOT EXISTS (SELECT 1 FROM tbUsers WHERE pkIdUser = @fkIdUser AND isDeleted = 0)
+				BEGIN
+					RAISERROR('Пользователь %d не найден или удалён', 16, 1, @fkIdUser);
+					RETURN;
+				END
+				BEGIN TRANSACTION;
+				INSERT INTO tbNotification (fkIdUser, message, isRead, createdAt)
+				VALUES (@fkIdUser, @message, 0, GETDATE());
+				DECLARE @newId INT = SCOPE_IDENTITY();
+				COMMIT TRANSACTION;
+				EXEC prGetNotifications @pkIdNotification = @newId;
+			END TRY
+			BEGIN CATCH
+				IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+				DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+				DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
+				DECLARE @ErrorState INT = ERROR_STATE();
+				RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
+			END CATCH
+		END
+		GO
+
 		CREATE OR ALTER PROCEDURE spNotificationsUpdate
 			@pkIdNotification INT, @isRead BIT = NULL
 		AS
@@ -3918,7 +4142,8 @@ go
 		CREATE OR ALTER PROCEDURE prGetCertificatesWithTemplates
 			@pkIdCertificate INT = NULL, @fkIdListener INT = NULL, @fkIdCourse INT = NULL, @isDeleted BIT = 0
 		AS BEGIN
-			SELECT c.pkIdCertificate, u.fullName AS listenerName,
+			SELECT c.pkIdCertificate, c.fkIdListener, c.fkIdCourse,
+				u.fullName AS listenerName,
 				course.title AS courseTitle, c.issuedAt, c.pdfUrl,  ct.name AS templateName, ct.templateHtml
 			FROM tbCertificate c
 			LEFT JOIN tbUsers u ON c.fkIdListener = u.pkIdUser
@@ -3936,16 +4161,19 @@ go
 		AS
 		BEGIN
 			SET NOCOUNT ON;
-			IF EXISTS (
-				SELECT 1 FROM tbCertificate 
-				WHERE fkIdListener = @fkIdListener AND fkIdCourse = @fkIdCourse AND isDeleted = 0
-			)
-			BEGIN
-				RAISERROR('Сертификат для данного пользователя по данному курсу уже существует', 16, 1);
-				RETURN;
-			END
 			BEGIN TRY
 				BEGIN TRANSACTION;
+
+				IF EXISTS (
+					SELECT 1 FROM tbCertificate WITH (UPDLOCK, HOLDLOCK)
+					WHERE fkIdListener = @fkIdListener AND fkIdCourse = @fkIdCourse AND isDeleted = 0
+				)
+				BEGIN
+					RAISERROR('Сертификат для данного пользователя по данному курсу уже существует', 16, 1);
+					ROLLBACK TRANSACTION;
+					RETURN;
+				END
+
 				INSERT INTO tbCertificate (fkIdListener, fkIdCourse, fkIdTemplate, pdfUrl, isDeleted)
 				VALUES (@fkIdListener, @fkIdCourse, @fkIdTemplate, @pdfUrl, 0);
 				DECLARE @newId INT = SCOPE_IDENTITY();
@@ -4566,7 +4794,13 @@ BEGIN
             INSERT INTO tbNotification (fkIdUser, message, createdAt)
             VALUES (
                 @listenerId,
-                CONCAT('Ваша работа «', @taskTitle, '» оценена: ', @score, '/', @maxScore, ' баллов.'),
+                CONCAT(
+                    'Ваша работа «', @taskTitle, '» принята. Балл: ',
+                    ISNULL(CAST(@score AS NVARCHAR(10)), '—'),
+                    ' из ',
+                    ISNULL(CAST(@maxScore AS NVARCHAR(10)), '—'),
+                    '.'
+                ),
                 GETDATE()
             );
         END
@@ -4780,6 +5014,68 @@ BEGIN
 
     CLOSE listener_cursor;
     DEALLOCATE listener_cursor;
+END;
+GO
+
+CREATE OR ALTER TRIGGER tgAfterMessageInserted
+ON tbMessage
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO tbNotification (fkIdUser, message, createdAt)
+    SELECT DISTINCT i.fkIdReceiver,
+        CONCAT(
+            N'Новое личное сообщение от ',
+            ISNULL(us.fullName, N'пользователя'),
+            N': ',
+            LEFT(i.message, 150),
+            CASE WHEN LEN(i.message) > 150 THEN N'…' ELSE N'' END
+        ),
+        GETDATE()
+    FROM inserted i
+    INNER JOIN tbUsers ur ON ur.pkIdUser = i.fkIdReceiver AND ur.isDeleted = 0
+    LEFT JOIN tbUsers us ON us.pkIdUser = i.fkIdSender AND us.isDeleted = 0
+    WHERE i.isDeleted = 0
+      AND i.fkIdReceiver IS NOT NULL
+      AND (i.fkIdSender IS NULL OR i.fkIdSender <> i.fkIdReceiver);
+END;
+GO
+
+CREATE OR ALTER TRIGGER tgAfterCommentInserted
+ON tbComment
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO tbNotification (fkIdUser, message, createdAt)
+    SELECT DISTINCT a.fkIdListener,
+        CONCAT(N'Новый комментарий к вашей работе по заданию «', t.title, N'».'),
+        GETDATE()
+    FROM inserted i
+    INNER JOIN tbAttempt a ON i.fkIdAttempt = a.pkIdAttempt AND a.isDeleted = 0
+    INNER JOIN tbTasks t ON a.fkIdTask = t.pkIdTask AND t.isDeleted = 0
+    INNER JOIN tbUsers ul ON ul.pkIdUser = a.fkIdListener AND ul.isDeleted = 0
+    WHERE i.isDeleted = 0
+      AND i.fkIdAttempt IS NOT NULL
+      AND i.fkIdUser <> a.fkIdListener;
+
+    INSERT INTO tbNotification (fkIdUser, message, createdAt)
+    SELECT DISTINCT g.fkIdCurator,
+        CONCAT(ul.fullName, N' оставил комментарий к работе по заданию «', t.title, N'».'),
+        GETDATE()
+    FROM inserted i
+    INNER JOIN tbAttempt a ON i.fkIdAttempt = a.pkIdAttempt AND a.isDeleted = 0
+    INNER JOIN tbTasks t ON a.fkIdTask = t.pkIdTask AND t.isDeleted = 0
+    INNER JOIN tbUsers ul ON ul.pkIdUser = i.fkIdUser AND ul.isDeleted = 0
+    INNER JOIN tbGroupListener gl ON gl.fkIdListener = a.fkIdListener AND gl.isDeleted = 0
+    INNER JOIN tbGroup g ON g.pkIdGroup = gl.fkIdGroup AND g.isDeleted = 0 AND g.fkIdCourse = t.fkIdCourse
+    INNER JOIN tbUsers ut ON ut.pkIdUser = g.fkIdCurator AND ut.isDeleted = 0
+    WHERE i.isDeleted = 0
+      AND i.fkIdAttempt IS NOT NULL
+      AND i.fkIdUser = a.fkIdListener;
 END;
 GO
 --#endregion

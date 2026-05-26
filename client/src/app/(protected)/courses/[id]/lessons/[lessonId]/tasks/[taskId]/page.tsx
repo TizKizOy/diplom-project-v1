@@ -1,15 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { tasksApi } from '@/lib/api/tasks.api';
 import { attemptsApi, type IAttempt } from '@/lib/api/attempts.api';
+import { checkListenerLessonSequentialAccess } from '@/lib/course/listenerLessonAccess';
 import { materialsApi } from '@/lib/api/materials.api';
 import { commentsApi, type IComment } from '@/lib/api/comments.api';
-import type { ITask, IMaterial } from '@/lib/types';
+import { getMaterialTitle, type ITask, type IMaterial } from '@/lib/types';
 import { ATTEMPT_STATUS, TASK_TYPE, MATERIAL_TYPE_ICONS } from '@/lib/constants';
 import Link from 'next/link';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
+import { attemptAnswerFileUrl } from '@/lib/attempts/attemptTaskId';
+import {
+  pickActiveAttemptForTask,
+  attemptHasSubmittedContent,
+} from '@/lib/attempts/pickActiveAttempt';
 import styles from './page.module.scss';
 
 export default function TaskPage() {
@@ -19,7 +26,6 @@ export default function TaskPage() {
   const courseId = Number(params.id);
   const lessonId = Number(params.lessonId);
   const taskId = Number(params.taskId);
-  const initialized = useRef(false);
 
   const [task, setTask] = useState<ITask | null>(null);
   const [materials, setMaterials] = useState<IMaterial[]>([]);
@@ -28,38 +34,60 @@ export default function TaskPage() {
   const [newComment, setNewComment] = useState('');
   const [commentSending, setCommentSending] = useState(false);
   const [answerText, setAnswerText] = useState('');
+  const [answerFileUrl, setAnswerFileUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [listenerAccessMessage, setListenerAccessMessage] = useState<string | null>(null);
 
   const isListener = checkRole(['Слушатель']);
   const isTeacher = checkRole(['Преподаватель']);
   const isAdmin = checkRole(['Администратор']);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [courseId, lessonId, taskId, user, isListener]);
 
   const loadData = async () => {
+    setLoading(true);
+    setError('');
     try {
       const [tasksData, materialsData] = await Promise.all([
         tasksApi.getByCourse(courseId),
         materialsApi.getByLesson(lessonId),
       ]);
 
-      const found = tasksData.find((t) => t.pkIdTask === taskId);
+      const found = tasksData.find((t) => Number(t.pkIdTask) === taskId);
       if (!found) { setError('Задание не найдено'); return; }
       setTask(found);
       setMaterials(materialsData.filter((m) => m.fkIdLesson === lessonId));
 
-      // Загружаем попытку слушателя
       if (user && isListener) {
+        const gate = await checkListenerLessonSequentialAccess(
+          courseId,
+          lessonId,
+          user.pkIdUser,
+        );
+        setListenerAccessMessage(gate.ok ? null : gate.message);
+      } else {
+        setListenerAccessMessage(null);
+      }
+
+      // Загружаем попытку слушателя (сброс при смене задания / повторной загрузке)
+      if (user && isListener) {
+        setAttempt(null);
+        setAnswerText('');
+        setAnswerFileUrl('');
+        setSubmitted(false);
         const attempts = await attemptsApi.getByListener(user.pkIdUser);
-        const existing = attempts.find((a: any) => a.fkIdTask === taskId || a.pkIdTask === taskId);
-        if (existing) setAttempt(existing);
+        const existing = pickActiveAttemptForTask(attempts, taskId);
+        if (existing) {
+          setAttempt(existing);
+          const at = existing.answerText?.trim() || '';
+          setAnswerText(at && at !== 'Тест' ? at : '');
+          setAnswerFileUrl(existing.answerFileUrl?.trim() || '');
+        }
       }
 
       // Загружаем комментарии
@@ -67,32 +95,58 @@ export default function TaskPage() {
         const taskComments = await commentsApi.getByTask(taskId);
         setComments(taskComments);
       } catch {}
-    } catch {
-      setError('Ошибка загрузки задания');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ошибка загрузки задания'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!user || !task || !answerText.trim()) {
-      setError('Введите ответ перед отправкой');
+    if (!user || !task) return;
+    const text = answerText.trim();
+    const file = answerFileUrl.trim();
+    if (!text && !file) {
+      setError('Введите текст ответа и/или ссылку на файл (Google Диск, OneDrive и т.п.)');
       return;
     }
     setSubmitting(true);
     setError('');
     try {
-      const newAttempt = await attemptsApi.create({
-        taskId,
-        listenerId: user.pkIdUser,
-        statusId: ATTEMPT_STATUS.PENDING,
-        answerText: answerText.trim(),
-      });
+      const payload = {
+        ...(text ? { answerText: text } : {}),
+        ...(file ? { answerFileUrl: file } : {}),
+      };
+      const newAttempt =
+        attempt?.statusName === 'На доработке'
+          ? await attemptsApi.resubmit(attempt.pkIdAttempt, payload)
+          : await attemptsApi.create({
+              taskId,
+              listenerId: user.pkIdUser,
+              statusId: ATTEMPT_STATUS.PENDING,
+              ...payload,
+            });
       setAttempt(newAttempt);
       setSubmitted(true);
       setAnswerText('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка отправки');
+      setAnswerFileUrl('');
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, '');
+      if (msg.includes('активная попытка') || msg.includes('активн')) {
+        try {
+          const attempts = await attemptsApi.getByListener(user.pkIdUser);
+          const existing = pickActiveAttemptForTask(attempts, taskId);
+          if (existing) {
+            setAttempt(existing);
+            setSubmitted(false);
+            setError('');
+            return;
+          }
+        } catch {
+          /* падаем в общее сообщение */
+        }
+      }
+      setError(getApiErrorMessage(err, 'Ошибка отправки'));
     } finally {
       setSubmitting(false);
     }
@@ -113,10 +167,6 @@ export default function TaskPage() {
     finally { setCommentSending(false); }
   };
 
-  const canResubmit = attempt?.statusName === 'Отклонено' || attempt?.statusName === 'На доработке';
-  const isTest = task?.taskTypeName === 'Тест' || (task as any)?.fkIdTypeTasks === TASK_TYPE.TEST;
-  const hasTestId = !!(task as any)?.fkIdTest;
-
   if (loading) return <div className={styles.loading}><div className={styles.spinner} /></div>;
   if (error && !task) return (
     <div className={styles.errorPage}>
@@ -125,6 +175,16 @@ export default function TaskPage() {
     </div>
   );
   if (!task) return null;
+
+  const canResubmit = attempt?.statusName === 'На доработке';
+  const attemptHasContent = attempt ? attemptHasSubmittedContent(attempt) : false;
+  const canSubmitAnswer =
+    !attempt || canResubmit || (attempt.statusName === 'На проверке' && !attemptHasContent);
+  const taskTypeId =
+    task.typeId ?? (task as { fkIdTypeTasks?: number }).fkIdTypeTasks;
+  const isTestTask = taskTypeId === TASK_TYPE.TEST;
+  const hasTestId = !!task.fkIdTest;
+  const canActAsListener = isListener && !listenerAccessMessage;
 
   return (
     <div className={styles.container}>
@@ -138,11 +198,50 @@ export default function TaskPage() {
       </div>
 
       {/* Task header */}
+      {listenerAccessMessage && isListener && (
+        <div className={styles.accessBanner}>
+          <p>{listenerAccessMessage}</p>
+          {listenerAccessMessage.includes('Запишитесь') && (
+            <Link href={`/courses/${courseId}/enroll`} className={styles.enrollLink}>
+              Записаться на курс
+            </Link>
+          )}
+        </div>
+      )}
+
+      {canResubmit && !submitted && (
+        <div className={styles.reworkBanner} role="status">
+          <strong>Работа отправлена на доработку</strong>
+          <p>
+            Преподаватель ожидает исправленный ответ. Заполните форму ниже и отправьте снова.
+            {attempt?.score != null && ` Текущий балл: ${attempt.score}.`}
+          </p>
+        </div>
+      )}
+
+      {attempt?.statusName === 'На проверке' && attemptHasContent && !submitted && (
+        <div className={styles.reviewBanner} role="status">
+          <strong>Работа на проверке.</strong> Преподаватель проверит ответ и выставит оценку. Вы получите уведомление о результате.
+        </div>
+      )}
+
       <div className={styles.taskCard}>
         <div className={styles.taskTop}>
           <span className={styles.taskTypeBadge}>{task.taskTypeName}</span>
           {attempt && (
-            <span className={`${styles.attemptStatus} ${styles[attempt.statusName === 'Принято' ? 'accepted' : attempt.statusName === 'На проверке' ? 'pending' : 'rejected']}`}>
+            <span
+              className={`${styles.attemptStatus} ${
+                styles[
+                  attempt.statusName === 'Принято'
+                    ? 'accepted'
+                    : attempt.statusName === 'На проверке'
+                      ? 'pending'
+                      : attempt.statusName === 'На доработке'
+                        ? 'revision'
+                        : 'rejected'
+                ]
+              }`}
+            >
               {attempt.statusName}
             </span>
           )}
@@ -189,10 +288,10 @@ export default function TaskPage() {
                 className={styles.materialItem}
               >
                 <span className={styles.matIcon}>
-                  {MATERIAL_TYPE_ICONS[m.fkIdTypeMaterial] || '📎'}
+                  {MATERIAL_TYPE_ICONS[m.fkIdTypeMaterial ?? 0] || 'Файл'}
                 </span>
                 <div className={styles.matInfo}>
-                  <strong>{m.title}</strong>
+                  <strong>{getMaterialTitle(m)}</strong>
                   {m.description && <span>{m.description}</span>}
                 </div>
                 <span className={styles.matArrow}>→</span>
@@ -205,7 +304,7 @@ export default function TaskPage() {
       {/* Result block (accepted) */}
       {attempt?.statusName === 'Принято' && (
         <div className={styles.resultCard}>
-          <div className={styles.resultIcon}>✅</div>
+          <div className={styles.resultIcon} aria-hidden />
           <div className={styles.resultInfo}>
             <h2>Задание принято!</h2>
             <p>Отправлено: {new Date(attempt.submittedAt).toLocaleDateString('ru-RU')}</p>
@@ -215,6 +314,26 @@ export default function TaskPage() {
                 <span>/ {task.maxScore}</span>
               </div>
             )}
+            {attempt.answerText && attempt.answerText !== 'Тест' && (
+              <div className={styles.submittedAnswer}>
+                <strong>Ваш ответ:</strong>
+                <p>{attempt.answerText}</p>
+              </div>
+            )}
+            {attemptAnswerFileUrl(attempt) && (
+              <div className={styles.submittedAnswer}>
+                <strong>Ссылка на файл / материалы:</strong>
+                <p>
+                  <a
+                    href={attemptAnswerFileUrl(attempt)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {attemptAnswerFileUrl(attempt)}
+                  </a>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -222,14 +341,24 @@ export default function TaskPage() {
       {/* Pending block */}
       {attempt?.statusName === 'На проверке' && !submitted && (
         <div className={styles.pendingCard}>
-          <div className={styles.pendingIcon}>⏳</div>
+          <div className={styles.pendingIcon} aria-hidden />
           <div>
             <h2>Ответ на проверке</h2>
             <p>Отправлено {new Date(attempt.submittedAt).toLocaleDateString('ru-RU')} · Ожидайте проверки преподавателем</p>
-            {attempt.answerText && (
+            {attempt.answerText && attempt.answerText !== 'Тест' && (
               <div className={styles.submittedAnswer}>
                 <strong>Ваш ответ:</strong>
                 <p>{attempt.answerText}</p>
+              </div>
+            )}
+            {attempt.answerFileUrl && (
+              <div className={styles.submittedAnswer}>
+                <strong>Файл / материалы:</strong>
+                <p>
+                  <a href={attempt.answerFileUrl} target="_blank" rel="noopener noreferrer">
+                    {attempt.answerFileUrl}
+                  </a>
+                </p>
               </div>
             )}
           </div>
@@ -239,7 +368,7 @@ export default function TaskPage() {
       {/* Rejected / revision block */}
       {(attempt?.statusName === 'Отклонено' || attempt?.statusName === 'На доработке') && (
         <div className={styles.rejectedCard}>
-          <div className={styles.rejectedIcon}>{attempt.statusName === 'Отклонено' ? '❌' : '🔄'}</div>
+          <div className={`${styles.rejectedIcon} ${attempt.statusName === 'Отклонено' ? styles.rejectedIconBad : styles.rejectedIconRev}`} aria-hidden />
           <div>
             <h2>{attempt.statusName}</h2>
             <p>Отправлено {new Date(attempt.submittedAt).toLocaleDateString('ru-RU')}</p>
@@ -250,7 +379,7 @@ export default function TaskPage() {
       {/* Success after submit */}
       {submitted && (
         <div className={styles.successCard}>
-          <div className={styles.successIcon}>✓</div>
+          <div className={styles.successIcon} aria-hidden />
           <div>
             <h2>Ответ отправлен!</h2>
             <p>Ваша работа принята и ожидает проверки преподавателем.</p>
@@ -259,7 +388,7 @@ export default function TaskPage() {
       )}
 
       {/* Test link */}
-      {isListener && !attempt && !submitted && isTest && hasTestId && (
+      {canActAsListener && !attempt && !submitted && isTestTask && hasTestId && (
         <div className={styles.card}>
           <h2>Тестовое задание</h2>
           <p className={styles.testHint}>Для выполнения этого задания необходимо пройти тест. Внимательно прочитайте вопросы.</p>
@@ -267,13 +396,20 @@ export default function TaskPage() {
             href={`/courses/${courseId}/lessons/${lessonId}/tasks/${taskId}/test`}
             className={styles.btnTest}
           >
-            🎯 Начать тест
+            Начать тест
           </Link>
         </div>
       )}
 
+      {canActAsListener && isTestTask && hasTestId === false && (
+        <div className={styles.card}>
+          <h2>Тест</h2>
+          <p className={styles.testHint}>Тест ещё не подключён к заданию. Обратитесь к преподавателю.</p>
+        </div>
+      )}
+
       {/* Answer form */}
-      {isListener && !submitted && (attempt === null || canResubmit) && !isTest && (
+      {canActAsListener && !submitted && canSubmitAnswer && !isTestTask && (
         <div className={styles.card}>
           <h2>{canResubmit ? 'Отправить повторно' : 'Ваш ответ'}</h2>
           {canResubmit && (
@@ -288,6 +424,19 @@ export default function TaskPage() {
             value={answerText}
             onChange={(e) => setAnswerText(e.target.value)}
           />
+          <label className={styles.fileLinkLabel}>
+            <span>Ссылка на файл (Google Диск, Яндекс.Диск, OneDrive и т.д.)</span>
+            <input
+              type="url"
+              className={styles.fileLinkInput}
+              placeholder="https://..."
+              value={answerFileUrl}
+              onChange={(e) => setAnswerFileUrl(e.target.value)}
+            />
+          </label>
+          <p className={styles.fieldHint}>
+            Достаточно текста в поле выше или ссылки на файл — можно указать оба варианта.
+          </p>
           {error && <p className={styles.errorText}>{error}</p>}
           <div className={styles.formActions}>
             <button
@@ -299,7 +448,7 @@ export default function TaskPage() {
             <button
               className={styles.btnSubmit}
               onClick={handleSubmit}
-              disabled={submitting || !answerText.trim()}
+              disabled={submitting || (!answerText.trim() && !answerFileUrl.trim())}
             >
               {submitting ? 'Отправка...' : 'Отправить на проверку'}
             </button>

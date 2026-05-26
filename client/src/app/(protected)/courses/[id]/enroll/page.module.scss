@@ -31,8 +31,9 @@ $dark: #0f172a;
   gap: 1.6rem;
   padding: 6.4rem;
   text-align: center;
+  min-height: 60vh;
+  background: #f5f5f5;
 
-  span:first-child { font-size: 4.8rem; }
   h2 { font-size: 2rem; font-weight: 600; color: $dark; }
 }
 
@@ -50,10 +51,16 @@ $dark: #0f172a;
 }
 
 .container {
-  max-width: 64rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4rem 1.6rem;
+  min-height: calc(100vh - 6rem);
   display: flex;
   flex-direction: column;
   gap: 2.4rem;
+  background: #f5f5f5;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .backBtn {
@@ -70,8 +77,9 @@ $dark: #0f172a;
 
 .coursePreview {
   background: #fff;
-  border: 1px solid $border;
-  border-radius: 1.6rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   padding: 3.2rem;
   display: flex;
   flex-direction: column;
@@ -101,8 +109,9 @@ $dark: #0f172a;
 
 .enrollSection {
   background: #fff;
-  border: 1px solid $border;
-  border-radius: 1.6rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   padding: 3.2rem;
   display: flex;
   flex-direction: column;
@@ -113,8 +122,15 @@ $dark: #0f172a;
 
 .infoCards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.2rem;
+  width: 100%;
+}
+
+@media (max-width: 52em) {
+  .infoCards {
+    grid-template-columns: 1fr;
+  }
 }
 
 .infoCard {
@@ -122,6 +138,7 @@ $dark: #0f172a;
   border: 1px solid $border;
   border-radius: 1rem;
   padding: 1.6rem;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 1.2rem;
@@ -136,7 +153,19 @@ $dark: #0f172a;
   }
 }
 
-.infoIcon { font-size: 2.4rem; }
+.infoIcon {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0066cc;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cce0f5;
+  border-radius: 0.6rem;
+  background: #f0f6ff;
+}
 
 .enrollInfo {
   p { font-size: 1.4rem; color: $muted; line-height: 1.6; }
@@ -169,7 +198,7 @@ $dark: #0f172a;
 }
 
 .btnPrimary {
-  background: $blue;
+  background: #0066cc;
   color: #fff;
   border: none;
   padding: 1.2rem 3.2rem;

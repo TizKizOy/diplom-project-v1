@@ -32,17 +32,28 @@ export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
   @Get()
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({ summary: 'Получить все активные материалы' })
   async getAll(): Promise<IMaterial[]> {
     return await this.materialsService.getAll();
   }
 
   @Get('course/:courseId')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить материалы курса' })
   async getByCourse(
     @Param('courseId', ParseIntPipe) courseId: number,
   ): Promise<IMaterial[]> {
     return await this.materialsService.getByCourse(courseId);
+  }
+
+  @Get('lesson/:lessonId')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({ summary: 'Получить материалы урока' })
+  async getByLesson(
+    @Param('lessonId', ParseIntPipe) lessonId: number,
+  ): Promise<IMaterial[]> {
+    return await this.materialsService.getByLesson(lessonId);
   }
 
   @Get('deleted/list')

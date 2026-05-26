@@ -25,6 +25,30 @@ $text-muted: #64748b;
   color: #0f172a;
 }
 
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2rem;
+}
+
+.toolbarBtn {
+  background: #fff;
+  color: $blue;
+  border: 1px solid $blue;
+  padding: 0.9rem 1.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: $blue-light;
+  }
+}
+
 .empty {
   background: #fff;
   border: 1px solid $border;
@@ -76,7 +100,12 @@ $text-muted: #64748b;
   justify-content: space-between;
 }
 
-.icon { font-size: 2.8rem; }
+.icon {
+  width: 0.45rem;
+  min-height: 2.8rem;
+  border-radius: 0.3rem;
+  background: #0066cc;
+}
 
 .date {
   font-size: 1.2rem;
@@ -104,18 +133,50 @@ $text-muted: #64748b;
   color: $text-muted;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: auto;
+}
+
 .downloadBtn {
   background: $blue;
   color: #fff;
   border: none;
-  padding: 1rem 2rem;
+  padding: 1rem 1.6rem;
   border-radius: 0.8rem;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;
-  margin-top: auto;
+  flex: 1;
+  min-width: 8rem;
 
   &:hover:not(:disabled) { background: #1e429f; }
   &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.secondaryBtn {
+  background: #fff;
+  color: $blue;
+  border: 1px solid $border;
+  padding: 1rem 1.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex: 1;
+  min-width: 8rem;
+
+  &:hover:not(:disabled) {
+    background: $blue-light;
+    border-color: $blue;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }

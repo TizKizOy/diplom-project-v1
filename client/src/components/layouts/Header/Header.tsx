@@ -12,12 +12,11 @@ export const Header: React.FC = () => {
 
   const isAdmin = checkRole(['Администратор']);
   const isTeacher = checkRole(['Преподаватель']);
-  const isListener = checkRole(['Слушатель']);
 
   const navLinks = [
     { href: '/main', label: 'Курсы', show: true },
     { href: '/account', label: 'Профиль', show: isAuthenticated },
-    { href: '/analytics', label: 'Аналитика', show: isAdmin || isTeacher },
+    { href: '/admin/analytics', label: 'Аналитика', show: isAdmin || isTeacher },
     { href: '/notifications', label: 'Уведомления', show: isAuthenticated },
     { href: '/messages', label: 'Сообщения', show: isAuthenticated },
   ];
@@ -55,7 +54,7 @@ export const Header: React.FC = () => {
               </button>
             </>
           ) : (
-            <Link href="/auth" className={styles.loginButton}>
+            <Link href="/auth/login" className={styles.loginButton}>
               Войти
             </Link>
           )}

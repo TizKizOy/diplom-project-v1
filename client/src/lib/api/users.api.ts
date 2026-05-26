@@ -27,6 +27,11 @@ export const usersApi = {
     return response.data;
   },
 
+  getMessagingContacts: async (): Promise<IUser[]> => {
+    const response = await apiClient.get('/users/messaging-contacts');
+    return response.data;
+  },
+
   getById: async (id: number): Promise<IUser> => {
     const response = await apiClient.get(`/users/${id}`);
     return response.data;

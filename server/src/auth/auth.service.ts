@@ -12,12 +12,15 @@ import {
   signAccess,
   signRefresh,
   verifyRefresh,
+  type IJwtPayload,
 } from 'src/common/jwt/jwt-utils';
 import { RegisterDto } from './dto/register.dto';
 import { findUserByLogin, createUserFromAuth } from './db/auth.db';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly usersService: UsersService) {}
   async login(login: string, password: string) {
     const user = await findUserByLogin(login);
 
@@ -87,5 +90,11 @@ export class AuthService {
       }
       throw new UnauthorizedException('Недействительный refresh токен');
     }
+  }
+
+  /** Актуальные данные из БД (JWT при логине может устареть после правки профиля). */
+  async getProfile(userId: number): Promise<IJwtPayload> {
+    const user = await this.usersService.getById(userId);
+    return generatePayload(user);
   }
 }

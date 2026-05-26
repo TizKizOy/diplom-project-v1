@@ -1,0 +1,58 @@
+.message {
+  margin: 0 0 1.6rem;
+  font-size: 1.4rem;
+  line-height: 1.55;
+  color: var(--gray-800, #1e293b);
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.btnPrimary {
+  padding: 0.8rem 1.6rem;
+  border: none;
+  border-radius: 0.8rem;
+  background: #1a56db;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    background: #1648c0;
+  }
+}
+
+.btnSecondary {
+  padding: 0.8rem 1.6rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.8rem;
+  background: #fff;
+  color: #475569;
+  font-size: 1.4rem;
+  cursor: pointer;
+
+  &:hover {
+    background: #f8fafc;
+  }
+}
+
+.btnDanger {
+  padding: 0.8rem 1.6rem;
+  border: none;
+  border-radius: 0.8rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    background: #b91c1c;
+  }
+}

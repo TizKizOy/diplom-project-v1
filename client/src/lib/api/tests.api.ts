@@ -27,6 +27,15 @@ export interface ITest {
   taskTitle?: string;
 }
 
+export interface ITestAnswerRow {
+  pkIdTestAnswer: number;
+  questionText: string;
+  optionText: string;
+  isCorrect?: boolean;
+  answeredAt?: string;
+  listenerName?: string;
+}
+
 export const testsApi = {
   getById: async (id: number): Promise<ITest> =>
     (await apiClient.get(`/tests/${id}`)).data,
@@ -37,9 +46,11 @@ export const testsApi = {
   getOptionsByQuestion: async (questionId: number): Promise<ITestOption[]> =>
     (await apiClient.get(`/test-options/question/${questionId}`)).data,
 
-  submitAnswers: async (dto: { attemptId: number; answersJson: string }) =>
-    (await apiClient.post('/test-answers/bulk', dto)).data,
+  submitAnswers: async (dto: {
+    attemptId: number;
+    answers: { questionId: number; optionId: number }[];
+  }) => (await apiClient.post('/test-answers/bulk', dto)).data,
 
-  getAnswersByAttempt: async (attemptId: number) =>
+  getAnswersByAttempt: async (attemptId: number): Promise<ITestAnswerRow[]> =>
     (await apiClient.get(`/test-answers/attempt/${attemptId}`)).data,
 };

@@ -132,3 +132,82 @@ export const hardDeleteUser = async (
   );
   return result[0];
 };
+
+const userListSelect = `
+SELECT DISTINCT u.pkIdUser, u.fullName, u.login, u.email, u.phone, u.passwordHash, u.regData,
+  r.name AS roleName, p.name AS positionName
+FROM tbUsers u
+LEFT JOIN tbRoles r ON u.fkIdRole = r.pkIdRole
+LEFT JOIN tbPositions p ON u.fkIdPosition = p.pkIdPosition
+`;
+
+/** Контакты для личных сообщений: админ — все; преподаватель/слушатель — по курсам и группам. */
+export const getMessagingContacts = async (
+  userId: number,
+  roleName: string,
+): Promise<IUser[]> => {
+  if (roleName === 'Администратор') {
+    return await query<IUser>(
+      `${userListSelect}
+       WHERE u.isDeleted = 0 AND u.pkIdUser <> @userId`,
+      { userId },
+    );
+  }
+
+  if (roleName === 'Преподаватель') {
+    return await query<IUser>(
+      `${userListSelect}
+       WHERE u.isDeleted = 0 AND u.pkIdUser <> @userId
+         AND (
+           u.fkIdRole = 1
+           OR u.pkIdUser IN (
+             SELECT gl.fkIdListener
+             FROM tbGroup g
+             INNER JOIN tbGroupListener gl ON gl.fkIdGroup = g.pkIdGroup AND gl.isDeleted = 0
+             WHERE g.fkIdCurator = @userId AND g.isDeleted = 0
+           )
+           OR u.pkIdUser IN (
+             SELECT DISTINCT gl2.fkIdListener
+             FROM tbCourseTeacher ct
+             INNER JOIN tbGroup g2 ON g2.fkIdCourse = ct.fkIdCourse AND g2.isDeleted = 0
+             INNER JOIN tbGroupListener gl2 ON gl2.fkIdGroup = g2.pkIdGroup AND gl2.isDeleted = 0
+             WHERE ct.fkIdTeacher = @userId AND ct.isDeleted = 0
+           )
+           OR u.pkIdUser IN (
+             SELECT DISTINCT ct2.fkIdTeacher
+             FROM tbCourseTeacher ct1
+             INNER JOIN tbCourseTeacher ct2
+               ON ct2.fkIdCourse = ct1.fkIdCourse AND ct2.isDeleted = 0 AND ct2.fkIdTeacher <> @userId
+             WHERE ct1.fkIdTeacher = @userId AND ct1.isDeleted = 0
+           )
+         )`,
+      { userId },
+    );
+  }
+
+  if (roleName === 'Слушатель') {
+    return await query<IUser>(
+      `${userListSelect}
+       WHERE u.isDeleted = 0 AND u.pkIdUser <> @userId
+         AND (
+           u.fkIdRole = 1
+           OR u.pkIdUser IN (
+             SELECT g.fkIdCurator
+             FROM tbGroupListener gl
+             INNER JOIN tbGroup g ON g.pkIdGroup = gl.fkIdGroup AND g.isDeleted = 0
+             WHERE gl.fkIdListener = @userId AND gl.isDeleted = 0 AND g.fkIdCurator IS NOT NULL
+           )
+           OR u.pkIdUser IN (
+             SELECT ct.fkIdTeacher
+             FROM tbGroupListener gl
+             INNER JOIN tbGroup g ON g.pkIdGroup = gl.fkIdGroup AND g.isDeleted = 0
+             INNER JOIN tbCourseTeacher ct ON ct.fkIdCourse = g.fkIdCourse AND ct.isDeleted = 0
+             WHERE gl.fkIdListener = @userId AND gl.isDeleted = 0
+           )
+         )`,
+      { userId },
+    );
+  }
+
+  return [];
+};

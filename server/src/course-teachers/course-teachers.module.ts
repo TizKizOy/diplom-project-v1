@@ -5,5 +5,6 @@ import { CourseTeachersController } from './course-teachers.controller';
 @Module({
   controllers: [CourseTeachersController],
   providers: [CourseTeachersService],
+  exports: [CourseTeachersService],
 })
 export class CourseTeachersModule {}

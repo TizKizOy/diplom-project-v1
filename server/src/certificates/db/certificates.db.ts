@@ -112,3 +112,66 @@ export const hardDeleteCertificate = async (
   );
   return result[0];
 };
+
+export interface ICertificateTemplateRow {
+  pkIdTemplate: number;
+  templateName: string;
+  templateHtml: string;
+  minScorePercent: number;
+  isActive: boolean;
+  courseTitle: string;
+}
+
+export const getCertificateTemplatesByCourse = async (
+  courseId: number,
+): Promise<ICertificateTemplateRow[]> => {
+  return await query<ICertificateTemplateRow>(
+    `EXEC prGetCertificateTemplates
+      @pkIdTemplate = NULL,
+      @fkIdCourse = @fkIdCourse,
+      @templateName = NULL,
+      @isActive = 1,
+      @isDeleted = 0`,
+    { fkIdCourse: courseId },
+  );
+};
+
+const DEFAULT_TEMPLATE_HTML = `<div style="text-align:center;padding:2rem">
+<h1>Сертификат</h1>
+<p>Настоящим подтверждается успешное прохождение курса.</p>
+</div>`;
+
+/** Создаёт активный шаблон по курсу, если его ещё нет. */
+export const ensureDefaultCertificateTemplate = async (
+  courseId: number,
+  courseTitle: string,
+): Promise<number> => {
+  const existing = await getCertificateTemplatesByCourse(courseId);
+  if (existing.length > 0) {
+    return existing[0].pkIdTemplate;
+  }
+  const name =
+    courseTitle.trim().length > 0
+      ? `Сертификат: ${courseTitle.trim().slice(0, 80)}`
+      : `Сертификат по курсу #${courseId}`;
+  const rows = await query<{ pkIdTemplate: number }>(
+    `EXEC spCertificateTemplatesCreate
+      @fkIdCourse = @fkIdCourse,
+      @name = @name,
+      @templateHtml = @templateHtml,
+      @minScorePercent = @minScorePercent,
+      @isActive = @isActive`,
+    {
+      fkIdCourse: courseId,
+      name,
+      templateHtml: DEFAULT_TEMPLATE_HTML,
+      minScorePercent: 0,
+      isActive: 1,
+    },
+  );
+  const id = rows[0]?.pkIdTemplate;
+  if (id == null) {
+    throw new Error('Не удалось создать шаблон сертификата');
+  }
+  return id;
+};

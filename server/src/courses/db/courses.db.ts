@@ -116,3 +116,59 @@ export const hardDeleteCourse = async (
   );
   return result[0];
 };
+
+export interface ICourseTagRow {
+  pkIdTag: number;
+  name: string;
+}
+
+export const getAllTags = async (): Promise<ICourseTagRow[]> => {
+  return await query<ICourseTagRow>(
+    `SELECT pkIdTag, name FROM tbTags ORDER BY name`,
+    {},
+  );
+};
+
+export const getCourseTagIds = async (courseId: number): Promise<number[]> => {
+  const rows = await query<{ fkIdTag: number }>(
+    `SELECT fkIdTag FROM tbCourseTags WHERE fkIdCourse = @courseId`,
+    { courseId },
+  );
+  return rows.map((r) => r.fkIdTag);
+};
+
+/** Есть хотя бы один урок с заданием (задание привязано к уроку). */
+export const courseHasLessonWithTask = async (
+  courseId: number,
+): Promise<boolean> => {
+  const rows = await query<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt
+     FROM tbTasks t
+     INNER JOIN tbLessons l ON t.fkIdLesson = l.pkIdLesson
+     WHERE l.fkIdCourse = @courseId AND t.isDeleted = 0 AND l.isDeleted = 0`,
+    { courseId },
+  );
+  return Number(rows[0]?.cnt ?? 0) > 0;
+};
+
+export const replaceCourseTags = async (
+  courseId: number,
+  tagIds: number[],
+  userId: number,
+): Promise<void> => {
+  await query(
+    `DELETE FROM tbCourseTags WHERE fkIdCourse = @courseId`,
+    { courseId },
+    userId,
+  );
+  const unique = [...new Set(tagIds)].filter(
+    (id) => Number.isFinite(id) && id > 0,
+  );
+  for (const fkIdTag of unique) {
+    await query(
+      `INSERT INTO tbCourseTags (fkIdCourse, fkIdTag) VALUES (@courseId, @fkIdTag)`,
+      { courseId, fkIdTag },
+      userId,
+    );
+  }
+};

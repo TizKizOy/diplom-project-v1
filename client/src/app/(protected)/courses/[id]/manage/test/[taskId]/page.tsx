@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { tasksApi } from '@/lib/api/tasks.api';
 import { testsApi, type ITestQuestion, type ITestOption } from '@/lib/api/tests.api';
 import apiClient from '@/lib/api/apiClient';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
 import styles from './page.module.scss';
 
 interface QuestionForm {
@@ -27,7 +28,6 @@ export default function TestEditorPage() {
   const router = useRouter();
   const courseId = Number(params.id);
   const taskId = Number(params.taskId);
-  const initialized = useRef(false);
 
   const [taskTitle, setTaskTitle] = useState('');
   const [testId, setTestId] = useState<number | null>(null);
@@ -43,14 +43,15 @@ export default function TestEditorPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const saveLockRef = useRef(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [courseId, taskId]);
 
   const loadData = async () => {
+    setLoading(true);
+    setError('');
     try {
       const tasks = await tasksApi.getByCourse(courseId);
       const task = tasks.find((t) => t.pkIdTask === taskId);
@@ -152,25 +153,42 @@ export default function TestEditorPage() {
   };
 
   const handleSave = async () => {
+    if (saveLockRef.current) return;
     setError('');
     setSuccess('');
 
-    // Validation
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.questionText.trim()) { setError(`Вопрос ${i + 1}: введите текст вопроса`); return; }
       if (q.options.length < 2) { setError(`Вопрос ${i + 1}: минимум 2 варианта ответа`); return; }
       if (!q.options.some((o) => o.isCorrect)) { setError(`Вопрос ${i + 1}: отметьте правильный ответ`); return; }
+      const qs = Math.trunc(Number(q.score));
+      if (!Number.isFinite(qs) || qs < 0 || qs > 1000) {
+        setError(`Вопрос ${i + 1}: балл за вопрос — целое число от 0 до 1000`);
+        return;
+      }
       for (const o of q.options) {
         if (!o.optionText.trim()) { setError(`Вопрос ${i + 1}: заполните все варианты ответа`); return; }
       }
     }
 
+    saveLockRef.current = true;
     setSaving(true);
     try {
       let currentTestId = testId;
+      const pickFirstRow = (data: unknown): Record<string, unknown> | undefined => {
+        if (data == null) return undefined;
+        if (Array.isArray(data)) return data[0] as Record<string, unknown>;
+        return data as Record<string, unknown>;
+      };
+      const pickId = (data: unknown, key: string): number | undefined => {
+        const row = pickFirstRow(data);
+        if (!row) return undefined;
+        const v = row[key] ?? row[key.charAt(0).toUpperCase() + key.slice(1)];
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
 
-      // Create or update test settings
       if (!currentTestId) {
         const newTest = await apiClient.post('/tests', {
           timeLimitMinutes: testSettings.timeLimitMinutes ? Number(testSettings.timeLimitMinutes) : null,
@@ -179,10 +197,13 @@ export default function TestEditorPage() {
           showResults: testSettings.showResults,
           passingScorePercent: testSettings.passingScorePercent,
         });
-        currentTestId = newTest.data.pkIdTest;
-        setTestId(currentTestId);
-        // Link test to task
-        await tasksApi.update(taskId, { testId: currentTestId });
+        const newTestId = pickId(newTest.data, 'pkIdTest');
+        if (newTestId == null) {
+          throw new Error('Не удалось создать тест: нет идентификатора в ответе сервера');
+        }
+        currentTestId = newTestId;
+        setTestId(newTestId);
+        await tasksApi.update(taskId, { testId: newTestId });
       } else {
         await apiClient.put(`/tests/${currentTestId}`, {
           timeLimitMinutes: testSettings.timeLimitMinutes ? Number(testSettings.timeLimitMinutes) : null,
@@ -193,22 +214,27 @@ export default function TestEditorPage() {
         });
       }
 
-      // Save questions and options
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
+      const nextQuestions: QuestionForm[] = questions.map((q) => ({
+        ...q,
+        options: q.options.map((o) => ({ ...o })),
+      }));
+
+      for (let i = 0; i < nextQuestions.length; i++) {
+        const q = nextQuestions[i];
         let questionId = q.pkIdQuestion;
 
         if (!questionId) {
-          // Create question
           const newQ = await apiClient.post('/test-questions', {
             testId: currentTestId,
             questionText: q.questionText,
             score: q.score,
             sortOrder: i + 1,
           });
-          questionId = newQ.data.pkIdQuestion || newQ.data[0]?.pkIdQuestion;
-          // Update local state
-          setQuestions((prev) => prev.map((pq, pi) => pi === i ? { ...pq, pkIdQuestion: questionId } : pq));
+          questionId = pickId(newQ.data, 'pkIdQuestion');
+          if (questionId == null) {
+            throw new Error(`Не удалось создать вопрос ${i + 1}`);
+          }
+          nextQuestions[i] = { ...q, pkIdQuestion: questionId };
         } else {
           await apiClient.put(`/test-questions/${questionId}`, {
             questionText: q.questionText,
@@ -217,9 +243,9 @@ export default function TestEditorPage() {
           });
         }
 
-        // Save options
-        for (let j = 0; j < q.options.length; j++) {
-          const o = q.options[j];
+        const qRef = nextQuestions[i];
+        for (let j = 0; j < qRef.options.length; j++) {
+          const o = qRef.options[j];
           if (!o.pkIdOption) {
             const newO = await apiClient.post('/test-options', {
               questionId,
@@ -227,11 +253,10 @@ export default function TestEditorPage() {
               isCorrect: o.isCorrect,
               sortOrder: j + 1,
             });
-            const newOptionId = newO.data.pkIdOption || newO.data[0]?.pkIdOption;
-            setQuestions((prev) => prev.map((pq, pi) => {
-              if (pi !== i) return pq;
-              return { ...pq, options: pq.options.map((po, pj) => pj === j ? { ...po, pkIdOption: newOptionId } : po) };
-            }));
+            const newOptionId = pickId(newO.data, 'pkIdOption');
+            if (newOptionId != null) {
+              qRef.options[j] = { ...o, pkIdOption: newOptionId };
+            }
           } else {
             await apiClient.put(`/test-options/${o.pkIdOption}`, {
               optionText: o.optionText,
@@ -242,10 +267,12 @@ export default function TestEditorPage() {
         }
       }
 
+      setQuestions(nextQuestions);
       setSuccess('Тест сохранён успешно!');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка сохранения теста');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ошибка сохранения теста'));
     } finally {
+      saveLockRef.current = false;
       setSaving(false);
     }
   };
@@ -329,7 +356,6 @@ export default function TestEditorPage() {
 
         {questions.length === 0 && (
           <div className={styles.emptyQuestions}>
-            <span>❓</span>
             <p>Добавьте вопросы для теста</p>
             <button onClick={addQuestion} className={styles.btnPrimary}>+ Добавить первый вопрос</button>
           </div>
@@ -344,7 +370,9 @@ export default function TestEditorPage() {
                   Баллов:
                   <input
                     type="number"
-                    min={1}
+                    min={0}
+                    max={1000}
+                    step={1}
                     value={q.score}
                     onChange={(e) => updateQuestion(qIdx, 'score', Number(e.target.value))}
                     className={styles.scoreInput}

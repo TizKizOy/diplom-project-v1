@@ -12,6 +12,8 @@ import {
   UseGuards,
   Query,
   NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +32,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -74,10 +77,51 @@ export class UsersController {
     return await this.usersService.getDeleted();
   }
 
+  @Get('messaging-contacts')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({
+    summary: 'Контакты для личных сообщений',
+    description:
+      'Администратор — все пользователи. Преподаватель — админы, слушатели в группах куратора и на своих курсов, коллеги по курсу. Слушатель — администраторы, кураторы групп и преподаватели курсов, на которые записан.',
+  })
+  async getMessagingContacts(
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IUser[]> {
+    return await this.usersService.getMessagingContacts(
+      user.pkIdUser,
+      user.roleName,
+    );
+  }
+
+  @Put('me')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({ summary: 'Обновить свой профиль' })
+  async updateMe(
+    @Body() body: UpdateUserDto,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IUser> {
+    const { roleId, login, ...rest } = body;
+    if (roleId !== undefined) {
+      throw new BadRequestException('Нельзя менять роль через профиль');
+    }
+    if (user.roleName !== Role.ADMIN && login !== undefined) {
+      throw new BadRequestException('Логин может изменить только администратор');
+    }
+    const dto: UpdateUserDto =
+      user.roleName === Role.ADMIN ? body : { ...rest, ...(login ? { login } : {}) };
+    return await this.usersService.update(user.pkIdUser, dto, user.pkIdUser);
+  }
+
   @Get(':id')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить пользователя по ID' })
-  async getById(@Param('id', ParseIntPipe) id: number): Promise<IUser> {
+  async getById(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IUser> {
+    if (user.roleName !== Role.ADMIN && user.roleName !== Role.TEACHER && user.pkIdUser !== id) {
+      throw new ForbiddenException('Нет прав на просмотр профиля другого пользователя');
+    }
     return await this.usersService.getById(id);
   }
 
@@ -92,14 +136,27 @@ export class UsersController {
   }
 
   @Put(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Обновить пользователя' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateUserDto,
-    @CurrentUser('pkIdUser') adminId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IUser> {
-    return await this.usersService.update(id, body, adminId);
+    if (user.roleName !== Role.ADMIN && user.pkIdUser !== id) {
+      throw new ForbiddenException('Нет прав на изменение чужого профиля');
+    }
+    if (user.roleName !== Role.ADMIN) {
+      const { roleId, login, ...rest } = body;
+      if (roleId !== undefined) {
+        throw new BadRequestException('Нельзя менять роль');
+      }
+      if (login !== undefined) {
+        throw new BadRequestException('Логин может изменить только администратор');
+      }
+      return await this.usersService.update(id, rest, user.pkIdUser);
+    }
+    return await this.usersService.update(id, body, user.pkIdUser);
   }
 
   @Delete(':id')

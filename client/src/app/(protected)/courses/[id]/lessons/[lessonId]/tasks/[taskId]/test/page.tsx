@@ -1,12 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { tasksApi } from '@/lib/api/tasks.api';
 import { attemptsApi } from '@/lib/api/attempts.api';
+import { checkListenerLessonSequentialAccess } from '@/lib/course/listenerLessonAccess';
 import { testsApi, type ITestQuestion, type ITestOption, type ITest } from '@/lib/api/tests.api';
+import { ATTEMPT_STATUS } from '@/lib/constants';
+import { getApiErrorMessage } from '@/lib/http/getApiErrorMessage';
+import { attemptMatchesTask } from '@/lib/attempts/attemptTaskId';
 import styles from './page.module.scss';
+
+const TEST_ATTEMPT_DONE_STATUSES = [
+  'Принято',
+  'На проверке',
+  'Отклонено',
+  'На доработке',
+];
 
 interface IAnswer {
   questionId: number;
@@ -16,11 +27,11 @@ interface IAnswer {
 export default function TestPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, checkRole } = useAuth();
   const courseId = Number(params.id);
   const lessonId = Number(params.lessonId);
   const taskId = Number(params.taskId);
-  const initialized = useRef(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [test, setTest] = useState<ITest | null>(null);
   const [questions, setQuestions] = useState<(ITestQuestion & { options: ITestOption[] })[]>([]);
@@ -32,13 +43,12 @@ export default function TestPage() {
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; total: number; passed: boolean } | null>(null);
   const [existingAttempt, setExistingAttempt] = useState<any>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isListener = checkRole(['Слушатель']);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     loadData();
-  }, []);
+  }, [courseId, lessonId, taskId, user, isListener]);
 
   // Timer
   useEffect(() => {
@@ -53,16 +63,34 @@ export default function TestPage() {
   }, [timeLeft]);
 
   const loadData = async () => {
+    setLoading(true);
+    setError('');
+    setExistingAttempt(null);
     try {
       const tasks = await tasksApi.getByCourse(courseId);
-      const task = tasks.find((t) => t.pkIdTask === taskId);
+      const task = tasks.find((t) => Number(t.pkIdTask) === taskId);
       if (!task?.fkIdTest) { setError('Тест не найден для этого задания'); return; }
+
+      if (user && isListener) {
+        const gate = await checkListenerLessonSequentialAccess(
+          courseId,
+          lessonId,
+          user.pkIdUser,
+        );
+        if (!gate.ok) {
+          setError(gate.message);
+          return;
+        }
+      }
 
       // Check existing attempt
       if (user) {
         const attempts = await attemptsApi.getByListener(user.pkIdUser);
-        const existing = attempts.find((a: any) => a.fkIdTask === taskId);
-        if (existing && (existing.statusName === 'Принято' || existing.statusName === 'На проверке')) {
+        const existing = attempts.find((a) => attemptMatchesTask(a, taskId));
+        if (
+          existing &&
+          TEST_ATTEMPT_DONE_STATUSES.includes(String(existing.statusName))
+        ) {
           setExistingAttempt(existing);
           setLoading(false);
           return;
@@ -124,7 +152,13 @@ export default function TestPage() {
         })),
       );
 
-      await testsApi.submitAnswers({ attemptId: attempt.pkIdAttempt, answersJson });
+      await testsApi.submitAnswers({
+        attemptId: attempt.pkIdAttempt,
+        answers: Object.entries(answers).map(([questionId, optionId]) => ({
+          questionId: Number(questionId),
+          optionId,
+        })),
+      });
 
       // Calculate score locally for display
       let score = 0;
@@ -141,13 +175,32 @@ export default function TestPage() {
       // Grade attempt automatically for tests
       await attemptsApi.grade(attempt.pkIdAttempt, {
         score,
-        statusId: passed ? 3 : 4, // 3=Принято, 4=Отклонено
+        statusId: passed ? ATTEMPT_STATUS.ACCEPTED : ATTEMPT_STATUS.REJECTED,
       });
 
       setResult({ score, total, passed });
       setSubmitted(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка отправки теста');
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, '');
+      if (msg.includes('активная попытка') || msg.includes('активн')) {
+        try {
+          if (user) {
+            const attempts = await attemptsApi.getByListener(user.pkIdUser);
+            const existing = attempts.find((a) => attemptMatchesTask(a, taskId));
+            if (
+              existing &&
+              TEST_ATTEMPT_DONE_STATUSES.includes(String(existing.statusName))
+            ) {
+              setExistingAttempt(existing);
+              setError('');
+              return;
+            }
+          }
+        } catch {
+          /* общее сообщение ниже */
+        }
+      }
+      setError(getApiErrorMessage(err, 'Ошибка отправки теста'));
     } finally {
       setSubmitting(false);
     }
@@ -170,9 +223,7 @@ export default function TestPage() {
     return (
       <div className={styles.container}>
         <div className={styles.resultCard}>
-          <div className={styles.resultIcon}>
-            {existingAttempt.statusName === 'Принято' ? '✅' : '⏳'}
-          </div>
+          <div className={`${styles.resultIcon} ${existingAttempt.statusName === 'Принято' ? styles.resultOk : styles.resultWait}`} aria-hidden />
           <h1>Тест уже пройден</h1>
           <p className={styles.resultStatus}>{existingAttempt.statusName}</p>
           {existingAttempt.score !== null && (
@@ -192,8 +243,8 @@ export default function TestPage() {
     return (
       <div className={styles.container}>
         <div className={styles.resultCard}>
-          <div className={styles.resultIcon}>{result.passed ? '🎉' : '😔'}</div>
-          <h1>{result.passed ? 'Тест пройден!' : 'Тест не пройден'}</h1>
+          <div className={`${styles.resultIcon} ${result.passed ? styles.resultOk : styles.resultFail}`} aria-hidden />
+          <h1>{result.passed ? 'Тест пройден' : 'Тест не пройден'}</h1>
           <div className={styles.resultStats}>
             <div className={styles.resultStat}>
               <span>Набрано баллов</span>

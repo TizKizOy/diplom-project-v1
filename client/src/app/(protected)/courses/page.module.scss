@@ -1,6 +1,6 @@
 // 1rem = 10px
-$blue: #1a56db;
-$blue-light: #e8f0fe;
+$blue: #0066cc;
+$blue-light: #e6f7f2;
 $border: #e2e8f0;
 $muted: #64748b;
 $dark: #0f172a;
@@ -50,7 +50,7 @@ $dark: #0f172a;
   white-space: nowrap;
   transition: background 0.15s;
 
-  &:hover { background: #1e429f; }
+  &:hover { background: #0052a3; }
 }
 
 // Filters
@@ -268,7 +268,7 @@ $dark: #0f172a;
   text-decoration: none;
   transition: background 0.15s;
 
-  &:hover { background: #1e429f; }
+  &:hover { background: #0052a3; }
 }
 
 .btnManage {

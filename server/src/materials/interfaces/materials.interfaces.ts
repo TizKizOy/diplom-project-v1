@@ -7,4 +7,9 @@ export interface IMaterial {
   typeName: string;
   lessonTitle: string;
   courseTitle: string;
+  fkIdCourse?: number;
+  fkIdLesson?: number;
+  fkIdTypeMaterial?: number;
+  sortOrder?: number;
+  isAdditional?: boolean;
 }

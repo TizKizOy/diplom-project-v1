@@ -10,9 +10,12 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AttemptsService } from './attempts.service';
+import { CourseTeachersService } from 'src/course-teachers/course-teachers.service';
+import { GroupsService } from 'src/groups/groups.service';
 import { IAttempt } from './interfaces/attempts.interfaces';
 import { IDeletedResult } from '../common/interfaces/delete.interfaces';
 import { IRestoredResult } from '../common/interfaces/restore.interface';
@@ -23,16 +26,38 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
+
+/** Числовой id из строки БД / recordset (camelCase и PascalCase). */
+function rowInt(row: object, ...keys: string[]): number | undefined {
+  const r = row as Record<string, unknown>;
+  for (const k of keys) {
+    const v = r[k];
+    if (v !== undefined && v !== null && v !== '') {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return undefined;
+}
 
 @ApiTags('Attempts')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('attempts')
 export class AttemptsController {
-  constructor(private readonly attemptsService: AttemptsService) {}
+  constructor(
+    private readonly attemptsService: AttemptsService,
+    private readonly courseTeachersService: CourseTeachersService,
+    private readonly groupsService: GroupsService,
+  ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить все попытки (доступно всем)' })
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({
+    summary: 'Получить все попытки',
+    description: 'Доступно администратору и преподавателю. Для аналитики по курсам преподавателя используйте GET /attempts/course/:courseId.',
+  })
   async getAll(): Promise<IAttempt[]> {
     return await this.attemptsService.getAll();
   }
@@ -41,7 +66,13 @@ export class AttemptsController {
   @ApiOperation({ summary: 'Получить попытки по заданию' })
   async getByTask(
     @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser('roleName') roleName: string,
   ): Promise<IAttempt[]> {
+    const canViewByTask = roleName === Role.ADMIN || roleName === Role.TEACHER;
+    if (!canViewByTask) {
+      throw new ForbiddenException('Нет прав на просмотр попыток по заданию');
+    }
+
     return await this.attemptsService.getByTask(taskId);
   }
 
@@ -49,7 +80,16 @@ export class AttemptsController {
   @ApiOperation({ summary: 'Получить попытки слушателя' })
   async getByListener(
     @Param('listenerId', ParseIntPipe) listenerId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IAttempt[]> {
+    const canViewOtherListeners =
+      user.roleName === Role.ADMIN || user.roleName === Role.TEACHER;
+    if (!canViewOtherListeners && user.pkIdUser !== listenerId) {
+      throw new ForbiddenException(
+        'Нет прав на просмотр попыток другого слушателя',
+      );
+    }
+
     return await this.attemptsService.getByListener(listenerId);
   }
 
@@ -60,7 +100,13 @@ export class AttemptsController {
   })
   async getByStatus(
     @Param('statusId', ParseIntPipe) statusId: number,
+    @CurrentUser('roleName') roleName: string,
   ): Promise<IAttempt[]> {
+    const canViewByStatus = roleName === Role.ADMIN || roleName === Role.TEACHER;
+    if (!canViewByStatus) {
+      throw new ForbiddenException('Нет прав на просмотр попыток по статусу');
+    }
+
     return await this.attemptsService.getByStatus(statusId);
   }
 
@@ -69,6 +115,48 @@ export class AttemptsController {
   @ApiOperation({ summary: 'Получить удалённые попытки' })
   async getDeleted(): Promise<IAttempt[]> {
     return await this.attemptsService.getDeleted();
+  }
+
+  @Get('course/:courseId')
+  @Roles(Role.ADMIN, Role.TEACHER)
+  @ApiOperation({
+    summary: 'Попытки по курсу',
+    description:
+      'Администратор — любой курс. Преподаватель — только курс, за который он закреплён.',
+  })
+  async getByCourse(
+    @Param('courseId', ParseIntPipe) courseId: number,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IAttempt[]> {
+    const courseNum = Number(courseId);
+    if (user.roleName === Role.TEACHER) {
+      const userId = Number(user.pkIdUser);
+      const onThisCourse =
+        await this.courseTeachersService.getByCourse(courseNum);
+      let allowed = onThisCourse.some((r) => {
+        const tid = rowInt(r, 'fkIdTeacher', 'FkIdTeacher');
+        return tid === userId;
+      });
+      if (!allowed) {
+        const assigned =
+          await this.courseTeachersService.getByTeacher(userId);
+        allowed = assigned.some((a) => {
+          const cid = rowInt(a, 'fkIdCourse', 'FkIdCourse');
+          return cid === courseNum;
+        });
+      }
+      if (!allowed) {
+        const groups = await this.groupsService.getByCourse(courseNum);
+        allowed = groups.some((g) => {
+          const cur = rowInt(g, 'fkIdCurator', 'FkIdCurator');
+          return cur === userId;
+        });
+      }
+      if (!allowed) {
+        throw new ForbiddenException('Нет доступа к попыткам по этому курсу');
+      }
+    }
+    return await this.attemptsService.getByCourse(courseNum);
   }
 
   @Get(':id')
@@ -86,9 +174,49 @@ export class AttemptsController {
   })
   async create(
     @Body() body: CreateAttemptDto,
-    @CurrentUser('pkIdUser') adminId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<IAttempt> {
-    return await this.attemptsService.create(body, adminId);
+    const canCreateForAnyListener =
+      user.roleName === Role.ADMIN || user.roleName === Role.TEACHER;
+    if (!canCreateForAnyListener && body.listenerId !== user.pkIdUser) {
+      throw new ForbiddenException(
+        'Нельзя создавать попытку от имени другого слушателя',
+      );
+    }
+
+    const safeBody = {
+      ...body,
+      listenerId: canCreateForAnyListener ? body.listenerId : user.pkIdUser,
+    };
+    return await this.attemptsService.create(safeBody, user.pkIdUser);
+  }
+
+  @Put(':id/resubmit')
+  @Roles(Role.LISTENER)
+  @ApiOperation({ summary: 'Повторная отправка работы (статус «На доработке»)' })
+  async resubmit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: Pick<CreateAttemptDto, 'answerText' | 'answerFileUrl'>,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IAttempt> {
+    return await this.attemptsService.resubmit(id, body, user.pkIdUser);
+  }
+
+  @Put(':id/grade')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({ summary: 'Оценить попытку (score/statusId)' })
+  async grade(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateAttemptDto,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IAttempt> {
+    if (user.roleName === Role.LISTENER) {
+      const attempt = await this.attemptsService.getById(id);
+      if (attempt.fkIdListener !== user.pkIdUser) {
+        throw new ForbiddenException('Нельзя выставлять оценку по чужой попытке');
+      }
+    }
+    return await this.attemptsService.update(id, body, user.pkIdUser);
   }
 
 

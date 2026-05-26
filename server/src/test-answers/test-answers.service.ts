@@ -44,7 +44,8 @@ export class TestAnswersService {
   }
 
   async getByAttempt(attemptId: number): Promise<ITestAnswer[]> {
-    return await this.getTestAnswers({ attemptId });
+    const answers = await db.getTestAnswers({ attemptId });
+    return answers || [];
   }
 
   async getByQuestion(questionId: number): Promise<ITestAnswer[]> {
@@ -77,10 +78,30 @@ export class TestAnswersService {
     try {
       return await db.bulkCreateTestAnswers(dto, adminId);
     } catch (e: any) {
-      throw new BadRequestException(
-        e.message || 'Ошибка массового создания ответов',
-      );
+      const msg = String(e?.message ?? '');
+      if (
+        !msg.includes('spTestAnswersBulkCreate') &&
+        !msg.includes('Could not find stored procedure')
+      ) {
+        throw new BadRequestException(
+          msg || 'Ошибка массового создания ответов',
+        );
+      }
     }
+
+    let lastId = 0;
+    for (const item of dto.answers) {
+      const row = await db.createTestAnswer(
+        {
+          attemptId: dto.attemptId,
+          questionId: item.questionId,
+          selectedOptionId: item.optionId,
+        },
+        adminId,
+      );
+      lastId = row.pkIdTestAnswer;
+    }
+    return { lastId, insertedCount: dto.answers.length };
   }
 
   async update(

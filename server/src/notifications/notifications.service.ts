@@ -47,8 +47,15 @@ export class NotificationsService {
     return notifications;
   }
 
-  async markAsRead(id: number, adminId: number): Promise<INotification> {
+  async create(dto: CreateNotificationDto, userId?: number): Promise<INotification> {
     try {
+      return await db.createNotification(dto, userId);
+    } catch (e: any) {
+      throw new BadRequestException(e.message || 'Ошибка создания уведомления');
+    }
+  }
+
+  async markAsRead(id: number, adminId: number): Promise<INotification> {    try {
       return await db.markNotificationAsRead(id, adminId);
     } catch (e: any) {
       if (e.message && e.message.includes('не найдено')) {

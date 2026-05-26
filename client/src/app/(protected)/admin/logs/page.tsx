@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { adminLogApi, type IAdminLog } from '@/lib/api/adminLog.api';
 import styles from './page.module.scss';
 
@@ -11,7 +11,6 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AdminLogsPage() {
-  const initialized = useRef(false);
   const [logs, setLogs] = useState<IAdminLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -20,8 +19,6 @@ export default function AdminLogsPage() {
   const [expandedLog, setExpandedLog] = useState<number | null>(null);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     adminLogApi.getAll()
       .then((data) => setLogs(data.sort((a, b) => new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime())))
       .catch(() => {})
@@ -97,8 +94,8 @@ export default function AdminLogsPage() {
             {filtered.length === 0 ? (
               <tr><td colSpan={5} className={styles.empty}>Записей не найдено</td></tr>
             ) : filtered.map((log) => (
-              <>
-                <tr key={log.pkIdLog} className={styles.row}>
+              <Fragment key={log.pkIdLog}>
+                <tr className={styles.row}>
                   <td className={styles.dateCell}>
                     {new Date(log.actionTime).toLocaleString('ru-RU', {
                       day: '2-digit', month: '2-digit', year: 'numeric',
@@ -124,7 +121,7 @@ export default function AdminLogsPage() {
                   </td>
                 </tr>
                 {expandedLog === log.pkIdLog && (
-                  <tr key={`${log.pkIdLog}-detail`} className={styles.detailRow}>
+                  <tr className={styles.detailRow}>
                     <td colSpan={5}>
                       <div className={styles.detailContent}>
                         {log.oldData && (
@@ -147,7 +144,7 @@ export default function AdminLogsPage() {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

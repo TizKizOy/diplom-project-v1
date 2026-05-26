@@ -68,3 +68,17 @@ export const hardDeleteNotification = async (
   );
   return rows[0];
 };
+
+export const createNotification = async (
+  dto: CreateNotificationDto,
+  adminId?: number,
+): Promise<INotification> => {
+  const rows = await query<INotification>(
+    `exec spNotificationsCreate
+     @fkIdUser = @fkIdUser,
+     @message = @message`,
+    { fkIdUser: dto.userId, message: dto.message },
+    adminId,
+  );
+  return rows[0];
+};

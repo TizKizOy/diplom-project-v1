@@ -185,7 +185,7 @@ export class AuthController {
       },
     },
   })
-  getMe(@CurrentUser() user: IJwtPayload) {
-    return user;
+  async getMe(@CurrentUser() user: IJwtPayload) {
+    return this.authService.getProfile(user.pkIdUser);
   }
 }

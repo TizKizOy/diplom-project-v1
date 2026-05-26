@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TestAnswersService } from './test-answers.service';
@@ -27,13 +28,19 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Role } from 'src/common/enums/role.enum';
+import type { IJwtPayload } from 'src/common/jwt/jwt-utils';
+import { AttemptsService } from 'src/attempts/attempts.service';
+import type { IAttempt } from 'src/attempts/interfaces/attempts.interfaces';
 
 @ApiTags('Test Answers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('test-answers')
 export class TestAnswersController {
-  constructor(private readonly testAnswersService: TestAnswersService) {}
+  constructor(
+    private readonly testAnswersService: TestAnswersService,
+    private readonly attemptsService: AttemptsService,
+  ) {}
 
   @Get()
   @Roles(Role.ADMIN, Role.TEACHER)
@@ -43,11 +50,20 @@ export class TestAnswersController {
   }
 
   @Get('attempt/:attemptId')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
   @ApiOperation({ summary: 'Получить ответы по ID попытки' })
   async getByAttempt(
     @Param('attemptId', ParseIntPipe) attemptId: number,
+    @CurrentUser() user: IJwtPayload,
   ): Promise<ITestAnswer[]> {
+    if (user.roleName === Role.LISTENER) {
+      const attempt = await this.attemptsService.getById(attemptId);
+      const row = attempt as IAttempt & { FkIdListener?: number };
+      const listenerId = Number(row.fkIdListener ?? row.FkIdListener);
+      if (listenerId !== user.pkIdUser) {
+        throw new ForbiddenException('Нет прав на просмотр ответов этой попытки');
+      }
+    }
     return await this.testAnswersService.getByAttempt(attemptId);
   }
 
@@ -74,6 +90,28 @@ export class TestAnswersController {
     return await this.testAnswersService.getById(id);
   }
 
+  /** Регистрируем до @Post(), чтобы путь bulk не пересёкся с общими правилами. */
+  @Post('bulk')
+  @Roles(Role.ADMIN, Role.TEACHER, Role.LISTENER)
+  @ApiOperation({
+    summary: 'Массовое создание ответов (завершение теста)',
+    description: 'Передаётся массив ответов для одной попытки',
+  })
+  async bulkCreate(
+    @Body() body: BulkCreateTestAnswersDto,
+    @CurrentUser() user: IJwtPayload,
+  ): Promise<IBulkCreateResult> {
+    if (user.roleName === Role.LISTENER) {
+      const attempt = await this.attemptsService.getById(body.attemptId);
+      const row = attempt as IAttempt & { FkIdListener?: number };
+      const listenerId = Number(row.fkIdListener ?? row.FkIdListener);
+      if (listenerId !== user.pkIdUser) {
+        throw new ForbiddenException('Нельзя сохранять ответы к чужой попытке');
+      }
+    }
+    return await this.testAnswersService.bulkCreate(body, user.pkIdUser);
+  }
+
   @Post()
   @Roles(Role.ADMIN, Role.TEACHER)
   @ApiOperation({
@@ -86,19 +124,6 @@ export class TestAnswersController {
     @CurrentUser('pkIdUser') adminId: number,
   ): Promise<ITestAnswer> {
     return await this.testAnswersService.create(body, adminId);
-  }
-
-  @Post('bulk')
-  @Roles(Role.ADMIN, Role.TEACHER)
-  @ApiOperation({
-    summary: 'Массовое создание ответов (завершение теста)',
-    description: 'Передаётся массив ответов для одной попытки',
-  })
-  async bulkCreate(
-    @Body() body: BulkCreateTestAnswersDto,
-    @CurrentUser('pkIdUser') adminId: number,
-  ): Promise<IBulkCreateResult> {
-    return await this.testAnswersService.bulkCreate(body, adminId);
   }
 
   @Put(':id')

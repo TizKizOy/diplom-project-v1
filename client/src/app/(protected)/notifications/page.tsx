@@ -1,26 +1,41 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { notificationsApi, type INotification } from '@/lib/api/notifications.api';
+import { useAppDialog } from '@/lib/hooks/useAppDialog';
 import styles from './page.module.scss';
 
 export default function NotificationsPage() {
   const { user } = useAuth();
-  const initialized = useRef(false);
+  const { alert } = useAppDialog();
 
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (!user) return;
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await notificationsApi.getByUser(user.pkIdUser);
       setNotifications(
@@ -42,7 +57,7 @@ export default function NotificationsPage() {
         prev.map((n) => (n.pkIdNotification === id ? { ...n, isRead: true } : n)),
       );
     } catch {
-      alert('Ошибка');
+      await alert('Не удалось отметить уведомление', 'Ошибка');
     }
   };
 
@@ -54,7 +69,7 @@ export default function NotificationsPage() {
       await Promise.all(unread.map((n) => notificationsApi.markRead(n.pkIdNotification)));
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch {
-      alert('Ошибка');
+      await alert('Не удалось отметить все уведомления', 'Ошибка');
     } finally {
       setMarkingAll(false);
     }
@@ -94,13 +109,7 @@ export default function NotificationsPage() {
               <div className={styles.itemContent}>
                 <p className={styles.itemMessage}>{n.message}</p>
                 <span className={styles.itemDate}>
-                  {new Date(n.createdAt).toLocaleString('ru-RU', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatDateTime(n.createdAt)}
                 </span>
               </div>
               {!n.isRead && (
